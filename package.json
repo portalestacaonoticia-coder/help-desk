@@ -1,0 +1,43 @@
+{
+  "name": "help-desk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "seed": "tsx scripts/seed.ts",
+    "ingest": "tsx scripts/ingest-once.ts"
+  },
+  "dependencies": {
+    "next": "15.4.6",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "drizzle-orm": "0.44.4",
+    "postgres": "3.4.7",
+    "imapflow": "1.0.191",
+    "mailparser": "3.7.4",
+    "nodemailer": "6.10.1",
+    "next-auth": "5.0.0-beta.29",
+    "bcryptjs": "3.0.2",
+    "zod": "4.0.14"
+  },
+  "devDependencies": {
+    "@types/node": "24.1.0",
+    "@types/react": "19.1.9",
+    "@types/react-dom": "19.1.7",
+    "@types/mailparser": "3.4.6",
+    "@types/nodemailer": "6.4.17",
+    "dotenv": "17.2.1",
+    "drizzle-kit": "0.31.4",
+    "tsx": "4.20.3",
+    "typescript": "5.9.2"
+  }
+}
