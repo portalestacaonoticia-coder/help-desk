@@ -1,14 +1,9 @@
 import Link from "next/link";
 import { and, eq, ilike, or, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { threads, mailboxes, users, messages } from "@/db/schema";
+import { threads, mailboxes, messages } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
-import {
-  STATUS_LABELS,
-  colorClass,
-  fmtRelative,
-  initials,
-} from "@/lib/ui";
+import { STATUS_LABELS, colorClass, fmtRelative } from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +40,9 @@ export default async function TicketsPage({
       lastMessageAt: threads.lastMessageAt,
       mailboxId: threads.mailboxId,
       mailboxLabel: mailboxes.label,
-      agentId: users.id,
-      agentName: users.name,
     })
     .from(threads)
     .innerJoin(mailboxes, eq(mailboxes.id, threads.mailboxId))
-    .leftJoin(users, eq(users.id, threads.assignedAgentId))
     .where(where)
     .orderBy(desc(threads.lastMessageAt))
     .limit(100);
@@ -163,7 +155,6 @@ export default async function TicketsPage({
             <div>Assunto</div>
             <div>Caixa</div>
             <div className="col-hide">Categoria</div>
-            <div className="col-hide">Responsável</div>
             <div>Status</div>
           </div>
 
@@ -191,21 +182,6 @@ export default async function TicketsPage({
                 </div>
                 <div className="col-hide">
                   {t.category ? <span className="pill">{t.category}</span> : <span className="t-meta">—</span>}
-                </div>
-                <div className="assignee col-hide">
-                  {t.agentName ? (
-                    <>
-                      <div className={`avatar ${colorClass(t.agentId)}`}>
-                        {initials(t.agentName)}
-                      </div>
-                      <span>{t.agentName.split(" ")[0]}</span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="avatar plain">—</div>
-                      <span className="t-meta">A definir</span>
-                    </>
-                  )}
                 </div>
                 <div>
                   <span className={`badge st-${t.status}`}>

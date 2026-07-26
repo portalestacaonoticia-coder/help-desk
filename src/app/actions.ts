@@ -103,22 +103,6 @@ export async function replyAction(formData: FormData) {
   revalidatePath("/tickets");
 }
 
-/** Atribui (ou desatribui) a thread a um agente. */
-export async function assignAction(formData: FormData) {
-  await requireUser();
-  const threadId = Number(formData.get("threadId"));
-  const raw = String(formData.get("agentId") ?? "");
-  const agentId = raw === "" ? null : Number(raw);
-
-  await db
-    .update(threads)
-    .set({ assignedAgentId: agentId })
-    .where(eq(threads.id, threadId));
-
-  revalidatePath(`/tickets/${threadId}`);
-  revalidatePath("/tickets");
-}
-
 /** Muda o status da thread. */
 export async function setStatusAction(formData: FormData) {
   await requireUser();

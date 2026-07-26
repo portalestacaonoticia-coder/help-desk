@@ -73,7 +73,6 @@ export const threads = pgTable("threads", {
   // aberto | fechado. Um chamado nasce aberto e só fecha por ação do agente;
   // resposta nova do cliente reabre (ver lib/imap.ts).
   status: text("status").notNull().default("aberto"),
-  assignedAgentId: integer("assigned_agent_id").references(() => users.id),
   category: text("category"),
 
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),

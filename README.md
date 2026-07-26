@@ -10,7 +10,7 @@ nada sai para o cliente sem um clique do agente.
 
 - **Fase 0** — Setup (Next.js App Router + TS, Drizzle, Postgres, cron). ✅
 - **Fase 1** — Ingestão IMAP idempotente das caixas, com threading e log por caixa. ✅
-- **Fase 2** — Auth, dashboard (lista + ticket), resposta via SMTP, atribuição, macros. ✅
+- **Fase 2** — Auth, dashboard (lista + ticket), resposta via SMTP, macros. ✅
 - **Fase 3** — Base de conhecimento, categorias e prompt base editáveis. ✅
 - **Fase 4** — Classificação e rascunho de resposta via DeepSeek, com trilha em `ai_actions`. ✅
 - **Fase 5** — Alertas de cron, métricas e dashboard. ⏳
@@ -130,12 +130,12 @@ src/
     ui.ts        helpers de formatação da interface
   app/
     login/       tela de login
-    tickets/     lista + [id] (thread, resposta, sugestão da IA, atribuição)
+    tickets/     lista + [id] (thread, resposta, sugestão da IA, status)
     base/        base de conhecimento, categorias e prompt base
     caixas/      CRUD das caixas + teste de conexão + status do ingest
     macros/      respostas prontas
     api/cron/ingest  endpoint do Vercel Cron (ingestão + rascunhos)
-    actions.ts   server actions (login, reply, assign, KB, caixas, sugestões)
+    actions.ts   server actions (login, reply, status, KB, caixas, sugestões)
 scripts/         seed, add-mailbox, ingest-once
 ```
 

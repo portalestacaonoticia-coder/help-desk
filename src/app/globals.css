@@ -540,7 +540,8 @@ label {
 }
 .trow {
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) 110px 120px 130px 150px;
+  /* ID · Assunto · Caixa · Categoria · Status */
+  grid-template-columns: 76px minmax(0, 1fr) 110px 120px 150px;
   gap: 12px;
   padding: 16px 24px;
   border-bottom: 1px solid hsl(var(--border));
@@ -691,19 +692,6 @@ a.trow:hover {
 .avatar.c4 { background: hsl(var(--c4) / 0.15); color: hsl(25 90% 38%); }
 .avatar.c5 { background: hsl(var(--c5) / 0.15); color: hsl(var(--c5)); }
 .avatar.c6 { background: hsl(var(--c6) / 0.2); color: hsl(45 90% 30%); }
-
-.assignee {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  min-width: 0;
-}
-.assignee span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* ---------------------------------------------------------- */
 /* Thread do chamado                                           */

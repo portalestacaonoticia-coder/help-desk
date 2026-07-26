@@ -2,10 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/db";
-import { threads, mailboxes, messages, users, macros } from "@/db/schema";
+import { threads, mailboxes, messages, macros } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
 import ReplyArea from "./_components/ReplyArea";
-import { assignAction, setStatusAction } from "@/app/actions";
+import { setStatusAction } from "@/app/actions";
 import {
   getAiSettingsSafe,
   getLatestSuggestion,
@@ -50,11 +50,6 @@ export default async function TicketPage({
     .where(eq(messages.threadId, threadId))
     .orderBy(asc(messages.createdAt));
 
-  const agents = await db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(eq(users.active, true));
-
   const macroList = await db
     .select({
       id: macros.id,
@@ -64,8 +59,6 @@ export default async function TicketPage({
     })
     .from(macros)
     .orderBy(macros.title);
-
-  const assignee = agents.find((a) => a.id === thread.assignedAgentId);
 
   // Rascunho da IA pendente para esta conversa, se houver. Tudo aqui é
   // tolerante a falha: o chamado precisa abrir mesmo com a IA indisponível.
@@ -179,26 +172,6 @@ export default async function TicketPage({
                 </button>
               </form>
 
-              <form action={assignAction}>
-                <input type="hidden" name="threadId" value={threadId} />
-                <label htmlFor="agentId">Responsável</label>
-                <select
-                  id="agentId"
-                  name="agentId"
-                  defaultValue={thread.assignedAgentId ?? ""}
-                >
-                  <option value="">Não atribuído</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" style={{ marginTop: 8, width: "100%" }}>
-                  Atribuir
-                </button>
-              </form>
-
               <div className="hr" />
 
               <div className="prop-row">
@@ -227,7 +200,7 @@ export default async function TicketPage({
                 <div className="avatar lg plain">{initials(thread.customerAddr)}</div>
                 <div className="agent-name">
                   <strong>{thread.customerAddr ?? "—"}</strong>
-                  <span>{assignee ? `Atendido por ${assignee.name}` : "Sem responsável"}</span>
+                  <span>{mailbox?.label ?? "—"}</span>
                 </div>
               </div>
             </div>
