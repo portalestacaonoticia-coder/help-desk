@@ -24,7 +24,9 @@ export const authConfig = {
       const isPublic =
         pathname.startsWith("/login") ||
         pathname.startsWith("/api/auth") ||
-        pathname.startsWith("/api/cron");
+        pathname.startsWith("/api/cron") ||
+        // Diagnóstico do banco — protegido pelo CRON_SECRET, não por sessão.
+        pathname.startsWith("/api/diag");
 
       if (isPublic) return true;
       return isLoggedIn;

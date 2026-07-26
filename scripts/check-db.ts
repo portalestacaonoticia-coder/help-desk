@@ -47,6 +47,55 @@ async function main() {
     console.log("\n⚠  Nenhuma caixa cadastrada — a ingestão não terá o que buscar.");
   }
 
+  /* ---- O build atual espera estas tabelas/colunas ---- */
+
+  const names = new Set(tables.map((r) => r.table_name));
+  const missingTables = [
+    "categories",
+    "knowledge_base",
+    "ai_settings",
+    "ai_actions",
+  ].filter((t) => !names.has(t));
+
+  const cols = await sql<{ table_name: string; column_name: string }[]>`
+    select table_name, column_name from information_schema.columns
+    where table_schema = 'public'`;
+  const have = new Set(cols.map((c) => `${c.table_name}.${c.column_name}`));
+  const missingColumns = [
+    "categories.description",
+    "categories.active",
+    "knowledge_base.keywords",
+    "knowledge_base.active",
+    "knowledge_base.updated_at",
+    "ai_actions.thread_id",
+    "ai_actions.status",
+    "ai_actions.summary",
+  ].filter((c) => names.has(c.split(".")[0]) && !have.has(c));
+
+  if (missingTables.length || missingColumns.length) {
+    console.log("\n⚠  MIGRATIONS PENDENTES — o código novo vai quebrar aqui.");
+    if (missingTables.length) console.log(`   Tabelas faltando: ${missingTables.join(", ")}`);
+    if (missingColumns.length) console.log(`   Colunas faltando: ${missingColumns.join(", ")}`);
+    console.log("   Rode: npm run db:generate && npm run db:migrate");
+  } else {
+    console.log("\n✓  Schema em dia com o código.");
+  }
+
+  /* ---- Status dos chamados (aberto | fechado) ---- */
+
+  const status = await sql<{ status: string; n: number }[]>`
+    select status, count(*)::int as n from threads group by status order by n desc`;
+  console.log("\nStatus dos chamados:");
+  for (const s of status) console.log(`  ${s.status.padEnd(20)} ${s.n}`);
+
+  const legacy = status.filter((s) => !["aberto", "fechado"].includes(s.status));
+  if (legacy.length > 0) {
+    console.log(
+      `\n⚠  ${legacy.reduce((t, s) => t + s.n, 0)} chamados ainda com status antigo.`,
+    );
+    console.log("   Rode: npm run migrate:status");
+  }
+
   await sql.end();
   process.exit(0);
 }
