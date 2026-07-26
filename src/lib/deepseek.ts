@@ -23,6 +23,13 @@ export type ChatOptions = {
   maxTokens?: number;
   /** Força a resposta a ser um objeto JSON válido. */
   json?: boolean;
+  /**
+   * Modo de raciocínio. Desligado por padrão — os modelos v4 pensam por padrão
+   * e devolvem o raciocínio em `reasoning_content`, deixando `content` VAZIO
+   * até o raciocínio terminar. Para classificar e-mail de suporte isso só
+   * queima token e arrisca truncar a resposta no meio do JSON.
+   */
+  thinking?: boolean;
   signal?: AbortSignal;
 };
 
@@ -61,8 +68,9 @@ export async function chat(
   const {
     model = DEFAULT_MODEL,
     temperature = 0.3,
-    maxTokens = 1500,
+    maxTokens = 2000,
     json = false,
+    thinking = false,
     signal,
   } = options;
 
@@ -78,6 +86,7 @@ export async function chat(
       temperature,
       max_tokens: maxTokens,
       stream: false,
+      thinking: { type: thinking ? "enabled" : "disabled" },
       ...(json ? { response_format: { type: "json_object" } } : {}),
     }),
     signal,
@@ -93,14 +102,31 @@ export async function chat(
 
   const data = (await response.json()) as {
     model?: string;
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{
+      message?: { content?: string; reasoning_content?: string };
+      finish_reason?: string;
+    }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
 
-  const content = data.choices?.[0]?.message?.content;
-  // O JSON mode do DeepSeek ocasionalmente devolve conteúdo vazio.
+  const choice = data.choices?.[0];
+  const content = choice?.message?.content;
+
+  // Estourar o max_tokens corta o JSON no meio — melhor falhar com uma mensagem
+  // que diz o que aconteceu do que deixar o JSON.parse quebrar depois.
+  if (choice?.finish_reason === "length") {
+    throw new DeepSeekError(
+      `Resposta truncada em ${maxTokens} tokens. Aumente max_tokens ou encurte os artigos da base.`,
+    );
+  }
+
   if (!content) {
-    throw new DeepSeekError("DeepSeek devolveu resposta vazia.");
+    const reasoned = Boolean(choice?.message?.reasoning_content);
+    throw new DeepSeekError(
+      reasoned
+        ? "DeepSeek gastou a resposta em raciocínio e não devolveu conteúdo."
+        : "DeepSeek devolveu resposta vazia.",
+    );
   }
 
   return {
