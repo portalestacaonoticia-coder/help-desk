@@ -6,6 +6,11 @@ import type { NextAuthConfig } from "next-auth";
  * fica em auth.ts (runtime Node).
  */
 export const authConfig = {
+  // Fica aqui (e não só em auth.ts) para que o middleware consiga decodificar o
+  // JWT: sem o mesmo secret, toda rota protegida cairia em redirect para /login.
+  // Auth.js v5 procura AUTH_SECRET; aceitamos NEXTAUTH_SECRET para não depender
+  // do nome usado no painel do Vercel.
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/login",
   },

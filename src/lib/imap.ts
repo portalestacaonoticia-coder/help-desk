@@ -1,6 +1,6 @@
 import { ImapFlow } from "imapflow";
 import { simpleParser, type ParsedMail } from "mailparser";
-import { and, eq, inArray, desc, gte } from "drizzle-orm";
+import { and, eq, inArray, desc, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { mailboxes, threads, messages, ingestLogs, type Mailbox } from "@/db/schema";
 import { decryptSecret } from "@/lib/crypto";
@@ -194,12 +194,18 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
 
         if (inserted.length > 0) {
           fetched++;
-          // Mensagem nova do cliente: atualiza a thread e reabre se resolvida.
+          // Mensagem nova do cliente: atualiza a thread e a traz de volta para a
+          // fila se estava resolvida ou parada aguardando resposta do cliente.
           await db
             .update(threads)
             .set({
               lastMessageAt: row.sentAt ?? new Date(),
               customerAddr: customerAddr ?? undefined,
+              status: sql`case
+                when ${threads.status} in ('resolvido', 'aguardando_cliente')
+                then 'novo'
+                else ${threads.status}
+              end`,
             })
             .where(eq(threads.id, threadId));
         }
@@ -231,6 +237,30 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
       status: "error",
       error: err instanceof Error ? err.message : String(err),
     };
+  }
+}
+
+/**
+ * Testa as credenciais IMAP de uma caixa sem ler mensagens.
+ * Usado pelo botão "testar conexão" da tela de caixas.
+ */
+export async function verifyImap(mb: Mailbox): Promise<void> {
+  const client = new ImapFlow({
+    host: mb.imapHost,
+    port: mb.imapPort,
+    secure: mb.imapTls,
+    auth: { user: mb.imapUser, pass: decryptSecret(mb.imapPassEnc) },
+    logger: false,
+  });
+
+  await client.connect();
+  try {
+    const lock = await client.getMailboxLock("INBOX");
+    lock.release();
+  } finally {
+    await client.logout().catch(() => {
+      /* ignora erro de logout */
+    });
   }
 }
 

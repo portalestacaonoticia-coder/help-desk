@@ -10,9 +10,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   session: { strategy: "jwt" },
   trustHost: true,
-  // Auth.js v5 procura AUTH_SECRET; aceitamos também NEXTAUTH_SECRET para não
-  // depender do nome usado no painel do Vercel.
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  // `secret` vem de authConfig, compartilhado com o middleware.
   providers: [
     Credentials({
       credentials: {

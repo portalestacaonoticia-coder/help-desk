@@ -628,6 +628,14 @@ a.trow:hover {
   background: hsl(var(--success) / 0.12);
   color: hsl(145 65% 30%);
 }
+.badge.st-erro {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive-text));
+}
+
+.ok-text {
+  color: hsl(145 65% 30%);
+}
 
 .tag {
   display: inline-flex;
@@ -923,6 +931,121 @@ a.trow:hover {
 }
 .field {
   margin-bottom: 14px;
+}
+
+/* ---------------------------------------------------------- */
+/* Formulários auxiliares, callouts e sugestão da IA           */
+/* ---------------------------------------------------------- */
+
+.hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  margin-bottom: 0;
+  cursor: pointer;
+}
+.check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  accent-color: hsl(var(--primary));
+  cursor: pointer;
+}
+
+button.danger {
+  border-color: hsl(var(--destructive) / 0.35);
+  color: hsl(var(--destructive-text));
+  background: hsl(var(--destructive) / 0.05);
+}
+button.danger:hover {
+  border-color: hsl(var(--destructive) / 0.6);
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive-text));
+}
+
+.callout {
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  background: hsl(var(--accent));
+  border: 1px solid hsl(var(--primary) / 0.2);
+  color: hsl(var(--foreground));
+}
+.callout.warn {
+  background: hsl(var(--warning) / 0.08);
+  border-color: hsl(var(--warning) / 0.35);
+}
+.callout.danger {
+  background: hsl(var(--destructive) / 0.06);
+  border-color: hsl(var(--destructive) / 0.3);
+}
+
+.macro-item.selected {
+  background: hsl(var(--accent) / 0.5);
+}
+
+/* Card roxo de sugestão da IA no chamado. */
+.ai-card {
+  border: 1px solid hsl(var(--primary) / 0.25);
+  background: hsl(var(--accent));
+  border-radius: 20px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ai-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ai-head .label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--primary));
+}
+.ai-head .meta {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.ai-draft {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.ai-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ai-sources {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
 }
 
 /* ---------------------------------------------------------- */

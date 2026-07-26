@@ -10,6 +10,12 @@ const ICONS = {
   macros: (
     <path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
   ),
+  base: (
+    <path d="m12 3-1.9 5.8L4.3 10.7l5.8 1.9L12 18.4l1.9-5.8 5.8-1.9-5.8-1.9z" />
+  ),
+  mailboxes: (
+    <path d="M2 4h20v16H2zM2 7l10 6 10-6" />
+  ),
 } as const;
 
 function NavItem({
@@ -81,10 +87,24 @@ export default function Sidebar({
 
         <div className="nav-section">Conhecimento</div>
         <NavItem
+          href="/base"
+          icon="base"
+          label="Base de conhecimento"
+          active={pathname.startsWith("/base")}
+        />
+        <NavItem
           href="/macros"
           icon="macros"
           label="Respostas prontas"
           active={pathname.startsWith("/macros")}
+        />
+
+        <div className="nav-section">Configuração</div>
+        <NavItem
+          href="/caixas"
+          icon="mailboxes"
+          label="Caixas de e-mail"
+          active={pathname.startsWith("/caixas")}
         />
       </nav>
 

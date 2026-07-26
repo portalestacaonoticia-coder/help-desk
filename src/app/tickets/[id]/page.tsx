@@ -4,8 +4,10 @@ import { eq, asc } from "drizzle-orm";
 import { db } from "@/db";
 import { threads, mailboxes, messages, users, macros } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
-import ReplyBox from "@/app/_components/ReplyBox";
+import ReplyArea from "./_components/ReplyArea";
 import { assignAction, setStatusAction } from "@/app/actions";
+import { getAiSettings, getLatestSuggestion, getSuggestionSources } from "@/lib/ai";
+import { isAiConfigured } from "@/lib/deepseek";
 import {
   STATUS_LABELS,
   colorClass,
@@ -60,6 +62,30 @@ export default async function TicketPage({
     .orderBy(macros.title);
 
   const assignee = agents.find((a) => a.id === thread.assignedAgentId);
+
+  // Rascunho da IA pendente para esta conversa, se houver.
+  const settings = await getAiSettings();
+  const action = await getLatestSuggestion(threadId);
+  const suggestion = action
+    ? {
+        id: action.id,
+        summary: action.summary,
+        draft: action.responseSent,
+        confidence: action.confidence,
+        category: action.categorySuggested,
+        model: action.model,
+        errorMessage: action.errorMessage,
+        sources: await getSuggestionSources(action.sourceArticleIds),
+      }
+    : null;
+
+  const lastInbound = [...msgs].reverse().find((m) => m.direction === "inbound");
+
+  const aiUnavailableReason = !isAiConfigured()
+    ? "DEEPSEEK_API_KEY não está configurada no ambiente."
+    : !settings.enabled
+      ? "A geração automática está desligada nas configurações da base de conhecimento."
+      : "Você pode gerar sob demanda.";
 
   return (
     <AppShell>
@@ -119,7 +145,14 @@ export default async function TicketPage({
               </div>
             </div>
 
-            <ReplyBox threadId={threadId} macros={macroList} />
+            <ReplyArea
+              threadId={threadId}
+              macros={macroList}
+              suggestion={suggestion}
+              lastInboundId={lastInbound?.id ?? null}
+              signature={settings.signature}
+              aiUnavailableReason={aiUnavailableReason}
+            />
           </div>
 
           <div className="thread-aside">

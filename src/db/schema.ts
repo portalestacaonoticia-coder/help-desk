@@ -5,7 +5,7 @@ import {
   text,
   boolean,
   timestamp,
-  numeric,
+  real,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -149,38 +149,101 @@ export const ingestLogs = pgTable("ingest_logs", {
 ]);
 
 /* ------------------------------------------------------------------ */
-/* Tabelas das Fases 3-4 (IA). Criadas agora só como schema; sem UI    */
-/* nem lógica ainda. Mantidas aqui para evitar migration extra depois. */
+/* Fases 3-4 — classificação e sugestão de resposta por IA (DeepSeek). */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Categorias de chamado. Alimentam a classificação da IA — `description`
+ * é o que o modelo lê para decidir em qual categoria a mensagem se encaixa.
+ *
+ * `autoRespondivel` marca categorias cujo rascunho PODE ser enviado sem
+ * revisão humana. Só tem efeito quando `ai_settings.auto_send_enabled` está
+ * ligado; hoje a operação é 100% rascunho.
+ */
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  description: text("description"),
   autoRespondivel: boolean("auto_respondivel").notNull().default(false),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("categories_name_uq").on(t.name),
 ]);
 
+/**
+ * Artigos da base de conhecimento. São injetados no prompt da IA como
+ * material de referência para redigir a resposta.
+ */
 export const knowledgeBase = pgTable("knowledge_base", {
   id: serial("id").primaryKey(),
   categoryId: integer("category_id").references(() => categories.id),
   title: text("title"),
   content: text("content"),
+  // Termos extras que ajudam a casar o artigo com o e-mail (separados por vírgula).
+  keywords: text("keywords"),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("knowledge_base_category_idx").on(t.categoryId),
+]);
+
+/**
+ * Configuração global da IA — linha única (id = 1).
+ * `basePrompt` é o prompt base que orienta o tom e as regras de resposta.
+ */
+export const aiSettings = pgTable("ai_settings", {
+  id: integer("id").primaryKey().default(1),
+  enabled: boolean("enabled").notNull().default(true),
+  model: text("model").notNull().default("deepseek-v4-flash"),
+  basePrompt: text("base_prompt").notNull().default(""),
+  // Assinatura anexada ao final de toda resposta gerada.
+  signature: text("signature"),
+  temperature: real("temperature").notNull().default(0.3),
+  // Abaixo deste limiar a IA não propõe categoria nem auto-envio (0 a 1).
+  confidenceThreshold: real("confidence_threshold").notNull().default(0.75),
+  // Trava mestra do envio automático. Off = tudo vira rascunho para revisão.
+  autoSendEnabled: boolean("auto_send_enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Uma linha por vez que a IA analisou uma mensagem recebida.
+ * Serve de rascunho para o agente e de trilha de auditoria do que o modelo
+ * sugeriu, com o que foi feito depois.
+ */
 export const aiActions = pgTable("ai_actions", {
   id: serial("id").primaryKey(),
   messageId: integer("message_id").references(() => messages.id),
+  threadId: integer("thread_id").references(() => threads.id),
+
   categorySuggested: text("category_suggested"),
-  confidence: numeric("confidence"),
-  actionTaken: text("action_taken"), // respondeu_auto | escalou_humano
+  confidence: real("confidence"),
+  // sugerido | auto_enviado | erro
+  actionTaken: text("action_taken"),
+  // Rascunho gerado pelo modelo (ou a resposta de fato enviada).
   responseSent: text("response_sent"),
+  // Resumo do problema, mostrado ao agente antes de ele ler a thread inteira.
+  summary: text("summary"),
+  // Ids dos artigos da KB usados, separados por vírgula.
+  sourceArticleIds: text("source_article_ids"),
+
+  model: text("model"),
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  errorMessage: text("error_message"),
+
+  // pendente | usada | descartada
+  status: text("status").notNull().default("pendente"),
   reviewed: boolean("reviewed").notNull().default(false),
   reviewResult: text("review_result"), // correta | errada
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index("ai_actions_thread_idx").on(t.threadId),
+  // Uma análise por mensagem — evita o cron reprocessar a mesma mensagem.
+  uniqueIndex("ai_actions_message_uq").on(t.messageId),
+]);
 
 // Tipos inferidos, reaproveitados no resto do código.
 export type Mailbox = typeof mailboxes.$inferSelect;
@@ -189,3 +252,7 @@ export type Thread = typeof threads.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Macro = typeof macros.$inferSelect;
+export type Category = typeof categories.$inferSelect;
+export type KbArticle = typeof knowledgeBase.$inferSelect;
+export type AiSettings = typeof aiSettings.$inferSelect;
+export type AiAction = typeof aiActions.$inferSelect;
