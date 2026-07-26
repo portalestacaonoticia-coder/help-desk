@@ -89,7 +89,7 @@ export default function MailboxManager({
                 <strong>{mb.label}</strong>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {mb.lastIngestStatus === "ok" && (
-                    <span className="badge st-resolvido">Ingestão ok</span>
+                    <span className="badge ok">Ingestão ok</span>
                   )}
                   {mb.lastIngestStatus === "error" && (
                     <span className="badge st-erro">Erro</span>

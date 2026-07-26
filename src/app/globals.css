@@ -612,19 +612,16 @@ a.trow:hover {
   background: hsl(220 20% 94%);
   color: hsl(var(--muted-foreground));
 }
-.badge.st-novo {
+.badge.st-aberto {
   background: hsl(var(--primary) / 0.1);
   color: hsl(var(--primary));
 }
-.badge.st-em_andamento {
-  background: hsl(var(--warning) / 0.12);
-  color: hsl(25 90% 38%);
+.badge.st-fechado {
+  background: hsl(220 20% 94%);
+  color: hsl(var(--muted-foreground));
 }
-.badge.st-aguardando_cliente {
-  background: hsl(270 80% 60% / 0.12);
-  color: hsl(270 70% 45%);
-}
-.badge.st-resolvido {
+/* Estado saudável genérico (ingestão ok, categoria auto-respondível). */
+.badge.ok {
   background: hsl(var(--success) / 0.12);
   color: hsl(145 65% 30%);
 }

@@ -195,7 +195,7 @@ export default async function BasePage() {
                     <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <span className="pill">{c.articleCount} artigos</span>
                       {c.autoRespondivel && (
-                        <span className="badge st-resolvido">Auto-respondível</span>
+                        <span className="badge ok">Auto-respondível</span>
                       )}
                       {!c.active && <span className="badge neutral">Inativa</span>}
                     </span>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, eq, ilike, or, ne, desc, sql } from "drizzle-orm";
+import { and, eq, ilike, or, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { threads, mailboxes, users, messages } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
@@ -86,7 +86,7 @@ export default async function TicketsPage({
   const [{ n: openTotal }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(threads)
-    .where(ne(threads.status, "resolvido"));
+    .where(eq(threads.status, "aberto"));
 
   function chipHref(next: Partial<SP>) {
     const params = new URLSearchParams();

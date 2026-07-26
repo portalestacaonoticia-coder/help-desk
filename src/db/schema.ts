@@ -70,7 +70,9 @@ export const threads = pgTable("threads", {
   // Endereço do cliente (contraparte), para busca e agrupamento.
   customerAddr: text("customer_addr"),
 
-  status: text("status").notNull().default("novo"), // novo | em_andamento | aguardando_cliente | resolvido
+  // aberto | fechado. Um chamado nasce aberto e só fecha por ação do agente;
+  // resposta nova do cliente reabre (ver lib/imap.ts).
+  status: text("status").notNull().default("aberto"),
   assignedAgentId: integer("assigned_agent_id").references(() => users.id),
   category: text("category"),
 

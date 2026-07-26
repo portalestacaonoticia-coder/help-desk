@@ -6,7 +6,11 @@ import { threads, mailboxes, messages, users, macros } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
 import ReplyArea from "./_components/ReplyArea";
 import { assignAction, setStatusAction } from "@/app/actions";
-import { getAiSettings, getLatestSuggestion, getSuggestionSources } from "@/lib/ai";
+import {
+  getAiSettingsSafe,
+  getLatestSuggestion,
+  getSuggestionSources,
+} from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
 import {
   STATUS_LABELS,
@@ -63,8 +67,9 @@ export default async function TicketPage({
 
   const assignee = agents.find((a) => a.id === thread.assignedAgentId);
 
-  // Rascunho da IA pendente para esta conversa, se houver.
-  const settings = await getAiSettings();
+  // Rascunho da IA pendente para esta conversa, se houver. Tudo aqui é
+  // tolerante a falha: o chamado precisa abrir mesmo com a IA indisponível.
+  const settings = await getAiSettingsSafe();
   const action = await getLatestSuggestion(threadId);
   const suggestion = action
     ? {

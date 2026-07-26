@@ -148,6 +148,24 @@ scripts/         seed, add-mailbox, ingest-once
 4. Deploy. O Vercel Cron passa a chamar a ingestão automaticamente.
 5. Cadastrar as caixas (`add-mailbox`) e criar o admin (`seed`).
 
+## Status dos chamados
+
+Só existem dois: **aberto** e **fechado**.
+
+- Chamado nasce `aberto` na ingestão.
+- Responder ao cliente **não** fecha — quem fecha é o agente, pelo seletor.
+- Resposta nova do cliente reabre um chamado fechado (`lib/imap.ts`), para não
+  ficar invisível na fila.
+
+Se o banco tiver dados dos 4 status antigos (`novo`, `em_andamento`,
+`aguardando_cliente`, `resolvido`), rode uma vez:
+
+```bash
+npm run migrate:status   # novo/em_andamento/aguardando_cliente -> aberto; resolvido -> fechado
+```
+
+O script é idempotente e imprime a contagem antes e depois.
+
 ## Próximos passos
 
 - Levantar com a Letícia as categorias reais e escrever os primeiros artigos —

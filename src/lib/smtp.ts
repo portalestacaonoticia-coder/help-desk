@@ -88,10 +88,11 @@ export async function sendReply(input: SendReplyInput) {
     sentAt: new Date(),
   });
 
-  // Após responder, a conversa fica aguardando o cliente.
+  // Responder não fecha o chamado: com apenas aberto/fechado, quem decide que
+  // o caso acabou é o agente, pelo seletor de status.
   await db
     .update(threads)
-    .set({ status: "aguardando_cliente", lastMessageAt: new Date() })
+    .set({ lastMessageAt: new Date() })
     .where(eq(threads.id, threadId));
 
   return { messageId: info.messageId, to };

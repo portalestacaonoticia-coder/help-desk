@@ -1,4 +1,4 @@
-import { ne, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { threads } from "@/db/schema";
@@ -20,7 +20,7 @@ export default async function AppShell({
   const [{ n: openCount }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(threads)
-    .where(ne(threads.status, "resolvido"));
+    .where(eq(threads.status, "aberto"));
 
   return (
     <div className="shell">

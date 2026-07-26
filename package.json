@@ -16,6 +16,7 @@
     "seed": "tsx scripts/seed.ts",
     "check:db": "tsx scripts/check-db.ts",
     "user": "tsx scripts/upsert-user.ts",
+    "migrate:status": "tsx scripts/migrate-status.ts",
     "ingest": "tsx scripts/ingest-once.ts"
   },
   "dependencies": {

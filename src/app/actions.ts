@@ -20,12 +20,7 @@ import { suggestReplyForMessage, getAiSettings } from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
 import { verifyImap } from "@/lib/imap";
 
-const VALID_STATUS = [
-  "novo",
-  "em_andamento",
-  "aguardando_cliente",
-  "resolvido",
-] as const;
+const VALID_STATUS = ["aberto", "fechado"] as const;
 
 /** Login com credenciais. Retorna mensagem de erro ou redireciona. */
 export async function loginAction(

@@ -43,6 +43,45 @@ export type Suggestion = {
   precisa_humano: boolean;
 };
 
+/**
+ * Configuração usada quando as tabelas da IA ainda não existem no banco.
+ * `enabled: false` porque sem migration não há onde gravar `ai_actions`.
+ */
+const FALLBACK_SETTINGS: AiSettings = {
+  id: 1,
+  enabled: false,
+  model: DEFAULT_MODEL,
+  basePrompt: DEFAULT_BASE_PROMPT,
+  signature: null,
+  temperature: 0.3,
+  confidenceThreshold: 0.75,
+  autoSendEnabled: false,
+  updatedAt: new Date(0),
+};
+
+/** Erro de tabela/coluna inexistente no Postgres (migration não aplicada). */
+function isMissingRelation(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  // 42P01 = undefined_table, 42703 = undefined_column
+  return code === "42P01" || code === "42703";
+}
+
+/**
+ * Igual a getAiSettings(), mas nunca lança: se as tabelas da IA não existem
+ * ainda, devolve a configuração desligada.
+ *
+ * Existe para que ler e responder um chamado — o núcleo do produto — não
+ * dependa da camada de IA estar migrada.
+ */
+export async function getAiSettingsSafe(): Promise<AiSettings> {
+  try {
+    return await getAiSettings();
+  } catch (err) {
+    if (isMissingRelation(err)) return FALLBACK_SETTINGS;
+    throw err;
+  }
+}
+
 /** Carrega (criando na primeira vez) a linha única de configuração da IA. */
 export async function getAiSettings(): Promise<AiSettings> {
   const [existing] = await db
@@ -401,15 +440,23 @@ export async function processPendingMessages(limit = 20): Promise<{
   return { processed, failed };
 }
 
-/** Rascunho pendente mais recente de uma thread, para exibir no chamado. */
+/**
+ * Rascunho pendente mais recente de uma thread, para exibir no chamado.
+ * Devolve null (em vez de lançar) se as tabelas da IA não existirem.
+ */
 export async function getLatestSuggestion(threadId: number) {
-  const [row] = await db
-    .select()
-    .from(aiActions)
-    .where(and(eq(aiActions.threadId, threadId), eq(aiActions.status, "pendente")))
-    .orderBy(desc(aiActions.createdAt))
-    .limit(1);
-  return row ?? null;
+  try {
+    const [row] = await db
+      .select()
+      .from(aiActions)
+      .where(and(eq(aiActions.threadId, threadId), eq(aiActions.status, "pendente")))
+      .orderBy(desc(aiActions.createdAt))
+      .limit(1);
+    return row ?? null;
+  } catch (err) {
+    if (isMissingRelation(err)) return null;
+    throw err;
+  }
 }
 
 /** Artigos citados por uma sugestão, para mostrar as fontes no card. */
@@ -420,8 +467,13 @@ export async function getSuggestionSources(sourceArticleIds: string | null) {
     .filter(Number.isInteger);
   if (ids.length === 0) return [];
 
-  return db
-    .select({ id: knowledgeBase.id, title: knowledgeBase.title })
-    .from(knowledgeBase)
-    .where(inArray(knowledgeBase.id, ids));
+  try {
+    return await db
+      .select({ id: knowledgeBase.id, title: knowledgeBase.title })
+      .from(knowledgeBase)
+      .where(inArray(knowledgeBase.id, ids));
+  } catch (err) {
+    if (isMissingRelation(err)) return [];
+    throw err;
+  }
 }

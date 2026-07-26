@@ -1,8 +1,6 @@
 export const STATUS_LABELS: Record<string, string> = {
-  novo: "Novo",
-  em_andamento: "Em andamento",
-  aguardando_cliente: "Aguardando cliente",
-  resolvido: "Resolvido",
+  aberto: "Aberto",
+  fechado: "Fechado",
 };
 
 export function initials(value: string | null | undefined): string {

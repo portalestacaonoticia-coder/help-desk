@@ -78,7 +78,7 @@ async function resolveThread(params: {
       subject: subject ?? null,
       subjectNormalized: subjectNormalized || null,
       customerAddr,
-      status: "novo",
+      status: "aberto",
     })
     .returning({ id: threads.id });
   return created.id;
@@ -194,18 +194,14 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
 
         if (inserted.length > 0) {
           fetched++;
-          // Mensagem nova do cliente: atualiza a thread e a traz de volta para a
-          // fila se estava resolvida ou parada aguardando resposta do cliente.
+          // Mensagem nova do cliente reabre o chamado: se já estava fechado,
+          // volta para a fila em vez de ficar invisível para a equipe.
           await db
             .update(threads)
             .set({
               lastMessageAt: row.sentAt ?? new Date(),
               customerAddr: customerAddr ?? undefined,
-              status: sql`case
-                when ${threads.status} in ('resolvido', 'aguardando_cliente')
-                then 'novo'
-                else ${threads.status}
-              end`,
+              status: sql`'aberto'`,
             })
             .where(eq(threads.id, threadId));
         }
