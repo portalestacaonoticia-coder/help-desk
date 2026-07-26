@@ -8,9 +8,18 @@ export default function LoginPage() {
 
   return (
     <div className="login-wrap">
-      <form action={formAction} className="panel login-card">
-        <h1>Help Desk</h1>
-        <p>Central de suporte — Tihee</p>
+      <form action={formAction} className="card login-card">
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/tihee-mark.svg" alt="Tihee" width={36} height={36} />
+          <div className="brand-name">
+            <strong>Suporte Tihee</strong>
+            <span>Central interna</span>
+          </div>
+        </div>
+
+        <h1>Entrar</h1>
+        <p>Acesse com sua conta do time de suporte.</p>
 
         <div className="field">
           <label htmlFor="email">E-mail</label>
@@ -24,7 +33,12 @@ export default function LoginPage() {
 
         {error && <p className="error">{error}</p>}
 
-        <button type="submit" className="primary" disabled={pending} style={{ width: "100%" }}>
+        <button
+          type="submit"
+          className="primary"
+          disabled={pending}
+          style={{ width: "100%", marginTop: 6 }}
+        >
           {pending ? "Entrando…" : "Entrar"}
         </button>
       </form>

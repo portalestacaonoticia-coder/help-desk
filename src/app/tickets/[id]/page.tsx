@@ -3,24 +3,18 @@ import { notFound } from "next/navigation";
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/db";
 import { threads, mailboxes, messages, users, macros } from "@/db/schema";
-import Topbar from "@/app/_components/Topbar";
+import AppShell from "@/app/_components/AppShell";
 import ReplyBox from "@/app/_components/ReplyBox";
 import { assignAction, setStatusAction } from "@/app/actions";
+import {
+  STATUS_LABELS,
+  colorClass,
+  fmtDateTime,
+  fmtRelative,
+  initials,
+} from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_LABELS: Record<string, string> = {
-  novo: "Novo",
-  em_andamento: "Em andamento",
-  aguardando_cliente: "Aguardando cliente",
-  resolvido: "Resolvido",
-};
-
-function fmtDate(d: Date | string | null): string {
-  if (!d) return "";
-  const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleString("pt-BR");
-}
 
 export default async function TicketPage({
   params,
@@ -65,47 +59,77 @@ export default async function TicketPage({
     .from(macros)
     .orderBy(macros.title);
 
+  const assignee = agents.find((a) => a.id === thread.assignedAgentId);
+
   return (
-    <>
-      <Topbar />
-      <div className="container">
-        <div style={{ marginBottom: 12 }}>
-          <Link href="/tickets">← Voltar</Link>
-        </div>
-        <h2 style={{ margin: "0 0 4px" }}>{thread.subject || "(sem assunto)"}</h2>
-        <div className="muted" style={{ marginBottom: 16 }}>
-          <span className="badge mailbox">{mailbox?.label}</span>{" "}
-          {thread.customerAddr} · {msgs.length} mensagem(ns)
+    <AppShell>
+      <section className="page">
+        <div>
+          <div className="breadcrumb">
+            <Link href="/tickets">Chamados</Link>
+            <span>/</span>
+            <span className="mono">#{thread.id}</span>
+          </div>
+          <h1 style={{ fontSize: 26 }}>{thread.subject || "(sem assunto)"}</h1>
+          <div className="chips" style={{ marginTop: 12 }}>
+            <span className={`tag ${colorClass(thread.mailboxId)}`}>
+              {mailbox?.label}
+            </span>
+            <span className={`badge st-${thread.status}`}>
+              {STATUS_LABELS[thread.status] ?? thread.status}
+            </span>
+            <span className="badge neutral">
+              {msgs.length} mensagem{msgs.length === 1 ? "" : "s"}
+            </span>
+          </div>
         </div>
 
         <div className="thread-grid">
-          <div>
-            <div className="panel">
-              {msgs.map((m) => (
-                <div key={m.id} className={`msg ${m.direction}`}>
-                  <div className="msg-head">
-                    <span className="msg-from">
-                      {m.direction === "outbound" ? "→ " : ""}
-                      {m.fromAddr}
-                    </span>
-                    <span>{fmtDate(m.sentAt ?? m.createdAt)}</span>
-                  </div>
-                  <div className="msg-body">
-                    {m.bodyText || "(sem corpo de texto)"}
-                  </div>
-                </div>
-              ))}
+          <div className="thread-col">
+            <div className="card">
+              <div className="msg-list">
+                {msgs.length === 0 ? (
+                  <div className="empty">Nenhuma mensagem nesta thread.</div>
+                ) : (
+                  msgs.map((m) => {
+                    const out = m.direction === "outbound";
+                    return (
+                      <div key={m.id} className={`msg ${m.direction}`}>
+                        <div
+                          className={`avatar lg ${out ? colorClass(m.sentByUserId) : "plain"}`}
+                        >
+                          {initials(m.fromAddr)}
+                        </div>
+                        <div className="msg-col">
+                          <div className="msg-head">
+                            <strong>{m.fromAddr || "(desconhecido)"}</strong>
+                            <span>
+                              {out ? "resposta" : "via e-mail"} ·{" "}
+                              {fmtDateTime(m.sentAt ?? m.createdAt)}
+                            </span>
+                          </div>
+                          <div className="msg-bubble">
+                            {m.bodyText || "(sem corpo de texto)"}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
             <ReplyBox threadId={threadId} macros={macroList} />
           </div>
 
-          <div>
-            <div className="panel sidebar-box">
-              <h3>Status</h3>
-              <form action={setStatusAction} className="field-row">
+          <div className="thread-aside">
+            <div className="card props">
+              <span className="card-title">Propriedades</span>
+
+              <form action={setStatusAction}>
                 <input type="hidden" name="threadId" value={threadId} />
-                <select name="status" defaultValue={thread.status}>
+                <label htmlFor="status">Status</label>
+                <select id="status" name="status" defaultValue={thread.status}>
                   {Object.entries(STATUS_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>
                       {l}
@@ -116,13 +140,15 @@ export default async function TicketPage({
                   Atualizar status
                 </button>
               </form>
-            </div>
 
-            <div className="panel sidebar-box">
-              <h3>Atribuição</h3>
-              <form action={assignAction} className="field-row">
+              <form action={assignAction}>
                 <input type="hidden" name="threadId" value={threadId} />
-                <select name="agentId" defaultValue={thread.assignedAgentId ?? ""}>
+                <label htmlFor="agentId">Responsável</label>
+                <select
+                  id="agentId"
+                  name="agentId"
+                  defaultValue={thread.assignedAgentId ?? ""}
+                >
                   <option value="">Não atribuído</option>
                   {agents.map((a) => (
                     <option key={a.id} value={a.id}>
@@ -134,19 +160,42 @@ export default async function TicketPage({
                   Atribuir
                 </button>
               </form>
+
+              <div className="hr" />
+
+              <div className="prop-row">
+                <span>Caixa</span>
+                <span className={`tag ${colorClass(thread.mailboxId)}`}>
+                  {mailbox?.label}
+                </span>
+              </div>
+              <div className="prop-row">
+                <span>Categoria</span>
+                <strong>{thread.category ?? "—"}</strong>
+              </div>
+              <div className="prop-row">
+                <span>Criado</span>
+                <strong>{fmtDateTime(thread.createdAt)}</strong>
+              </div>
+              <div className="prop-row">
+                <span>Última msg</span>
+                <strong>{fmtRelative(thread.lastMessageAt)}</strong>
+              </div>
             </div>
 
-            <div className="panel sidebar-box">
-              <h3>Detalhes</h3>
-              <div className="muted" style={{ fontSize: 13 }}>
-                <div>Categoria: {thread.category ?? "—"}</div>
-                <div>Criado: {fmtDate(thread.createdAt)}</div>
-                <div>Última msg: {fmtDate(thread.lastMessageAt)}</div>
+            <div className="card props">
+              <span className="card-title">Solicitante</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="avatar lg plain">{initials(thread.customerAddr)}</div>
+                <div className="agent-name">
+                  <strong>{thread.customerAddr ?? "—"}</strong>
+                  <span>{assignee ? `Atendido por ${assignee.name}` : "Sem responsável"}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </>
+      </section>
+    </AppShell>
   );
 }

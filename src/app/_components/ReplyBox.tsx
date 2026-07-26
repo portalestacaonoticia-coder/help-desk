@@ -10,7 +10,20 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className="primary" disabled={pending}>
-      {pending ? "Enviando…" : "Enviar resposta"}
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="m22 2-7 20-4-9-9-4Z" />
+        <path d="M22 2 11 13" />
+      </svg>
+      {pending ? "Enviando…" : "Enviar"}
     </button>
   );
 }
@@ -31,9 +44,13 @@ export default function ReplyBox({
   }
 
   return (
-    <div className="panel reply-box" style={{ padding: 16, marginTop: 16 }}>
+    <div className="card composer">
+      <div className="composer-tabs">
+        <span>Responder</span>
+      </div>
+
       {macros.length > 0 && (
-        <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="macro-bar">
           {macros.map((m) => (
             <button
               key={m.id}
@@ -46,6 +63,7 @@ export default function ReplyBox({
           ))}
         </div>
       )}
+
       <form
         action={async (fd) => {
           await replyAction(fd);
@@ -61,10 +79,11 @@ export default function ReplyBox({
           placeholder="Escreva a resposta ao cliente…"
           required
         />
-        <div className="reply-actions">
+        <div className="composer-actions" style={{ marginTop: 12 }}>
           <span className="muted" style={{ fontSize: 12 }}>
             Enviado via SMTP da caixa de origem, mantendo o encadeamento.
           </span>
+          <div className="spacer" />
           <SubmitButton />
         </div>
       </form>

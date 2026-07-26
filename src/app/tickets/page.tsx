@@ -1,30 +1,18 @@
 import Link from "next/link";
-import { and, eq, ilike, or, desc, sql } from "drizzle-orm";
+import { and, eq, ilike, or, ne, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { threads, mailboxes, users, messages } from "@/db/schema";
-import Topbar from "@/app/_components/Topbar";
+import AppShell from "@/app/_components/AppShell";
+import {
+  STATUS_LABELS,
+  colorClass,
+  fmtRelative,
+  initials,
+} from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
 
 type SP = { mailbox?: string; status?: string; q?: string };
-
-const STATUS_LABELS: Record<string, string> = {
-  novo: "Novo",
-  em_andamento: "Em andamento",
-  aguardando_cliente: "Aguardando cliente",
-  resolvido: "Resolvido",
-};
-
-function fmtDate(d: Date | string | null): string {
-  if (!d) return "";
-  const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default async function TicketsPage({
   searchParams,
@@ -53,8 +41,11 @@ export default async function TicketsPage({
       subject: threads.subject,
       customerAddr: threads.customerAddr,
       status: threads.status,
+      category: threads.category,
       lastMessageAt: threads.lastMessageAt,
+      mailboxId: threads.mailboxId,
       mailboxLabel: mailboxes.label,
+      agentId: users.id,
       agentName: users.name,
     })
     .from(threads)
@@ -92,14 +83,37 @@ export default async function TicketsPage({
     .groupBy(threads.status);
   const countByStatus = new Map(statusCounts.map((s) => [s.status, s.n]));
 
+  const [{ n: openTotal }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(threads)
+    .where(ne(threads.status, "resolvido"));
+
+  function chipHref(next: Partial<SP>) {
+    const params = new URLSearchParams();
+    const merged = { mailbox: sp.mailbox, status: sp.status, q: sp.q, ...next };
+    for (const [k, v] of Object.entries(merged)) if (v) params.set(k, v);
+    const qs = params.toString();
+    return qs ? `/tickets?${qs}` : "/tickets";
+  }
+
   return (
-    <>
-      <Topbar />
-      <div className="container">
-        <form className="filters" method="get">
+    <AppShell query={sp.q}>
+      <section className="page">
+        <div className="page-head">
           <div>
-            <label>Caixa</label>
-            <select name="mailbox" defaultValue={sp.mailbox ?? ""}>
+            <h1>Fila de chamados</h1>
+            <p className="page-sub">
+              {openTotal} chamado{openTotal === 1 ? "" : "s"} em aberto no
+              ecossistema Tihee.
+            </p>
+          </div>
+        </div>
+
+        <form className="filters" method="get">
+          {sp.q ? <input type="hidden" name="q" value={sp.q} /> : null}
+          <div>
+            <label htmlFor="f-mailbox">Caixa</label>
+            <select id="f-mailbox" name="mailbox" defaultValue={sp.mailbox ?? ""}>
               <option value="">Todas</option>
               {mbList.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -109,8 +123,8 @@ export default async function TicketsPage({
             </select>
           </div>
           <div>
-            <label>Status</label>
-            <select name="status" defaultValue={sp.status ?? ""}>
+            <label htmlFor="f-status">Status</label>
+            <select id="f-status" name="status" defaultValue={sp.status ?? ""}>
               <option value="">Todos</option>
               {Object.entries(STATUS_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -120,10 +134,6 @@ export default async function TicketsPage({
               ))}
             </select>
           </div>
-          <div className="grow">
-            <label>Busca (assunto ou e-mail)</label>
-            <input name="q" defaultValue={sp.q ?? ""} placeholder="Buscar…" />
-          </div>
           <div>
             <button type="submit" className="primary">
               Filtrar
@@ -131,47 +141,82 @@ export default async function TicketsPage({
           </div>
         </form>
 
-        <div className="panel">
+        <div className="chips">
+          <Link href={chipHref({ status: undefined })} className={`chip${!status ? " active" : ""}`}>
+            Todos
+          </Link>
+          {Object.entries(STATUS_LABELS).map(([v, l]) => (
+            <Link
+              key={v}
+              href={chipHref({ status: v })}
+              className={`chip${status === v ? " active" : ""}`}
+            >
+              {l}
+              {countByStatus.has(v) ? ` · ${countByStatus.get(v)}` : ""}
+            </Link>
+          ))}
+        </div>
+
+        <div className="card table">
+          <div className="trow thead">
+            <div>ID</div>
+            <div>Assunto</div>
+            <div>Caixa</div>
+            <div className="col-hide">Categoria</div>
+            <div className="col-hide">Responsável</div>
+            <div>Status</div>
+          </div>
+
           {rows.length === 0 ? (
-            <div style={{ padding: 32, textAlign: "center" }} className="muted">
-              Nenhum ticket encontrado. Assim que a ingestão IMAP rodar, os
+            <div className="empty">
+              Nenhum chamado encontrado. Assim que a ingestão IMAP rodar, os
               e-mails aparecem aqui.
             </div>
           ) : (
-            <ul className="ticket-list">
-              {rows.map((t) => (
-                <li key={t.id} className="ticket-row">
-                  <div>
-                    <span className={`badge ${t.status}`}>
-                      {STATUS_LABELS[t.status] ?? t.status}
-                    </span>
+            rows.map((t) => (
+              <Link key={t.id} href={`/tickets/${t.id}`} className="trow">
+                <div className="mono t-meta">#{t.id}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div className="t-subject">{t.subject || "(sem assunto)"}</div>
+                  <div className="t-preview">
+                    {t.customerAddr ? `${t.customerAddr} · ` : ""}
+                    {fmtRelative(t.lastMessageAt)}
+                    {previews.get(t.id) ? ` · ${previews.get(t.id)}` : ""}
                   </div>
-                  <div style={{ overflow: "hidden" }}>
-                    <div className="ticket-subject">
-                      <Link href={`/tickets/${t.id}`}>
-                        {t.subject || "(sem assunto)"}
-                      </Link>
-                    </div>
-                    <div className="ticket-preview">
-                      {previews.get(t.id) || t.customerAddr || ""}
-                    </div>
-                  </div>
-                  <div className="ticket-meta">
-                    <span className="badge mailbox">{t.mailboxLabel}</span>
-                    <div style={{ marginTop: 4 }}>
-                      {t.agentName ? `→ ${t.agentName}` : "não atribuído"}
-                    </div>
-                  </div>
-                  <div className="ticket-meta" style={{ textAlign: "right" }}>
-                    {t.customerAddr}
-                    <div>{fmtDate(t.lastMessageAt)}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                </div>
+                <div>
+                  <span className={`tag ${colorClass(t.mailboxId)}`}>
+                    {t.mailboxLabel}
+                  </span>
+                </div>
+                <div className="col-hide">
+                  {t.category ? <span className="pill">{t.category}</span> : <span className="t-meta">—</span>}
+                </div>
+                <div className="assignee col-hide">
+                  {t.agentName ? (
+                    <>
+                      <div className={`avatar ${colorClass(t.agentId)}`}>
+                        {initials(t.agentName)}
+                      </div>
+                      <span>{t.agentName.split(" ")[0]}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="avatar plain">—</div>
+                      <span className="t-meta">A definir</span>
+                    </>
+                  )}
+                </div>
+                <div>
+                  <span className={`badge st-${t.status}`}>
+                    {STATUS_LABELS[t.status] ?? t.status}
+                  </span>
+                </div>
+              </Link>
+            ))
           )}
         </div>
-      </div>
-    </>
+      </section>
+    </AppShell>
   );
 }
