@@ -21,6 +21,7 @@ import { suggestReplyForMessage, getAiSettings } from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
 import { verifyImap } from "@/lib/imap";
 import { deleteLead, EverinboxError } from "@/lib/everinbox";
+import { isCategory } from "@/lib/ui";
 
 const VALID_STATUS = ["aberto", "fechado"] as const;
 
@@ -131,14 +132,8 @@ export async function setCategoryAction(formData: FormData) {
   const threadId = Number(formData.get("threadId"));
   const category = String(formData.get("category") ?? "").trim();
 
-  if (category) {
-    const [known] = await db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(and(eq(categories.name, category), eq(categories.active, true)))
-      .limit(1);
-    if (!known) throw new Error("Categoria inválida");
-  }
+  // A lista é fixa em lib/ui — não confiar no valor que veio do select.
+  if (category && !isCategory(category)) throw new Error("Categoria inválida");
 
   await db
     .update(threads)
@@ -253,30 +248,6 @@ async function requireAdmin() {
     throw new Error("Apenas administradores podem alterar esta configuração");
   }
   return user;
-}
-
-export async function createCategoryAction(formData: FormData) {
-  await requireUser();
-  const name = String(formData.get("name") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
-  if (!name) throw new Error("Nome da categoria é obrigatório");
-
-  await db
-    .insert(categories)
-    .values({ name, description })
-    .onConflictDoNothing();
-  revalidatePath("/base");
-}
-
-export async function toggleCategoryAction(formData: FormData) {
-  await requireUser();
-  const id = Number(formData.get("id"));
-  const field = String(formData.get("field") ?? "");
-  const value = String(formData.get("value") ?? "") === "true";
-
-  if (field !== "active") throw new Error("Campo inválido");
-  await db.update(categories).set({ active: value }).where(eq(categories.id, id));
-  revalidatePath("/base");
 }
 
 export async function saveArticleAction(formData: FormData) {

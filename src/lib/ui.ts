@@ -3,6 +3,24 @@ export const STATUS_LABELS: Record<string, string> = {
   fechado: "Fechado",
 };
 
+/**
+ * Categorias da triagem. São FIXAS: quem classifica é o agente, na tela do
+ * chamado, e a lista não muda por operação. Mexer aqui muda a aplicação
+ * inteira — não há mais tela de cadastro.
+ */
+export const CATEGORIES = [
+  "Interesse",
+  "Reclamação",
+  "Cancelamento",
+  "Sem Resposta",
+] as const;
+
+export type Category = (typeof CATEGORIES)[number];
+
+export function isCategory(value: string): value is Category {
+  return (CATEGORIES as readonly string[]).includes(value);
+}
+
 export function initials(value: string | null | undefined): string {
   if (!value) return "—";
   const name = value.includes("@") ? value.split("@")[0] : value;

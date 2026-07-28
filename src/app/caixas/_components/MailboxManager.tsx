@@ -141,7 +141,7 @@ export default function MailboxManager({
               </div>
 
               <div className="prop-row">
-                <span>Última entrada ok</span>
+                <span>Último e-mail entrou</span>
                 <strong>
                   {mb.lastOkAt
                     ? new Date(mb.lastOkAt).toLocaleString("pt-BR")

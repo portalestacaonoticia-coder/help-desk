@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/db";
-import { threads, mailboxes, messages, macros, categories } from "@/db/schema";
+import { threads, mailboxes, messages, macros } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
 import ReplyArea from "./_components/ReplyArea";
 import UnsubscribeButton from "./_components/UnsubscribeButton";
@@ -15,6 +15,7 @@ import {
 import { isAiConfigured } from "@/lib/deepseek";
 import {
   STATUS_LABELS,
+  CATEGORIES,
   colorClass,
   fmtDateTime,
   fmtRelative,
@@ -53,12 +54,6 @@ export default async function TicketPage({
     .from(messages)
     .where(eq(messages.threadId, threadId))
     .orderBy(asc(messages.createdAt));
-
-  const categoryList = await db
-    .select({ id: categories.id, name: categories.name })
-    .from(categories)
-    .where(eq(categories.active, true))
-    .orderBy(categories.name);
 
   const macroList = await db
     .select({
@@ -193,9 +188,9 @@ export default async function TicketPage({
                   defaultValue={thread.category ?? ""}
                 >
                   <option value="">Sem categoria</option>
-                  {categoryList.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
                     </option>
                   ))}
                 </select>

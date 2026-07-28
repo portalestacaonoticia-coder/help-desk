@@ -1,6 +1,6 @@
 import { asc, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { mailboxes, threads, ingestLogs } from "@/db/schema";
+import { mailboxes, threads, messages, ingestLogs } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import AppShell from "@/app/_components/AppShell";
 import { fmtRelative } from "@/lib/ui";
@@ -61,22 +61,23 @@ export default async function MailboxesPage() {
     [...logRows].map((r) => [Number(r.mailbox_id), r]),
   );
 
-  // Última execução BEM-SUCEDIDA por caixa. É esse o sinal de saúde: desde que
-  // a ingestão passou a gravar o ponteiro por lote, uma rodada que falha não
-  // perde o progresso — a seguinte continua de onde parou. Alarmar por causa
-  // do status da última tentativa dá falso positivo com erro intermitente.
-  const okRows = await db.execute<{ mailbox_id: number; created_at: string }>(
-    sql`select distinct on (mailbox_id) mailbox_id, created_at
-        from ${ingestLogs}
-        where mailbox_id is not null and status = 'ok'
-        order by mailbox_id, created_at desc`,
-  );
+  // Sinal de saúde = a última mensagem que ENTROU de fato, não o status do
+  // log. Uma rodada pode morrer no meio (timeout, socket caído) depois de já
+  // ter gravado dezenas de e-mails: o log fica 'error', mas a caixa está
+  // funcionando. Só `messages` responde "entrou e-mail?" sem intermediário.
+  const entryRows = await db
+    .select({
+      mailboxId: messages.mailboxId,
+      lastAt: sql<string>`max(${messages.createdAt})`,
+    })
+    .from(messages)
+    .groupBy(messages.mailboxId);
   const lastOkByMailbox = new Map(
-    [...okRows].map((r) => [Number(r.mailbox_id), new Date(r.created_at)]),
+    entryRows.map((r) => [r.mailboxId, new Date(r.lastAt)]),
   );
 
-  // Sem nenhuma entrada bem-sucedida nesse intervalo, a caixa está de fato
-  // parada e o alarme vermelho se justifica.
+  // Sem nenhum e-mail novo nesse intervalo, a caixa está de fato parada e o
+  // alarme vermelho se justifica.
   const STALL_THRESHOLD_MS = 6 * 60 * 60 * 1000;
   const now = Date.now();
 
