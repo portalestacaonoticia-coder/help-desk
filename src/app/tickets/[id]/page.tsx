@@ -213,7 +213,12 @@ export default async function TicketPage({
               </div>
               <div className="prop-row">
                 <span>Criado</span>
-                <strong>{fmtDateTime(thread.createdAt)}</strong>
+                {/* Data do e-mail do cliente, não a da linha no banco: com o
+                    backlog sendo ingerido agora, createdAt é o momento em que
+                    o cron leu a mensagem, não quando ela foi enviada. */}
+                <strong>
+                  {fmtDateTime(msgs[0]?.sentAt ?? thread.createdAt)}
+                </strong>
               </div>
               <div className="prop-row">
                 <span>Última msg</span>
