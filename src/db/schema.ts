@@ -18,6 +18,9 @@ import {
 export const mailboxes = pgTable("mailboxes", {
   id: serial("id").primaryKey(),
   label: text("label").notNull(),
+  // Nome da operação/área que atende essa caixa (ex.: "Estação Finanças").
+  // É o que aparece na navegação; sem valor, cai no `label`.
+  operation: text("operation"),
 
   imapHost: text("imap_host").notNull(),
   imapPort: integer("imap_port").notNull().default(993),

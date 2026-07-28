@@ -17,6 +17,7 @@ export default async function MailboxesPage() {
     .select({
       id: mailboxes.id,
       label: mailboxes.label,
+      operation: mailboxes.operation,
       imapHost: mailboxes.imapHost,
       imapPort: mailboxes.imapPort,
       imapUser: mailboxes.imapUser,

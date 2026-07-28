@@ -311,6 +311,8 @@ export async function saveMailboxAction(formData: FormData) {
 
   const rawId = String(formData.get("id") ?? "").trim();
   const label = String(formData.get("label") ?? "").trim();
+  // Sem operação informada, a navegação cai no rótulo.
+  const operation = String(formData.get("operation") ?? "").trim() || label;
   const imapHost = String(formData.get("imapHost") ?? "").trim();
   const imapUser = String(formData.get("imapUser") ?? "").trim();
   const imapPass = String(formData.get("imapPass") ?? "");
@@ -331,6 +333,7 @@ export async function saveMailboxAction(formData: FormData) {
 
   const common = {
     label,
+    operation,
     imapHost,
     imapPort,
     imapUser,

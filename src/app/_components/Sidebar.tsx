@@ -51,18 +51,29 @@ function NavItem({
   );
 }
 
+export type OperationNav = {
+  id: number;
+  name: string;
+  openCount: number;
+};
+
 export default function Sidebar({
   openCount,
+  operations,
+  activeMailbox,
   agentName,
   agentInitials,
   agentRole,
 }: {
   openCount: number;
+  operations: OperationNav[];
+  activeMailbox: string | null;
   agentName: string;
   agentInitials: string;
   agentRole: string;
 }) {
   const pathname = usePathname();
+  const inTickets = pathname.startsWith("/tickets");
 
   return (
     <aside className="sidebar">
@@ -76,14 +87,34 @@ export default function Sidebar({
       </div>
 
       <nav className="nav">
-        <div className="nav-section">Operação</div>
-        <NavItem
-          href="/tickets"
-          icon="tickets"
-          label="Chamados"
-          count={openCount}
-          active={pathname.startsWith("/tickets")}
-        />
+        <div className="nav-section">
+          {operations.length === 1 ? "Operação" : "Operações"}
+        </div>
+        {operations.length === 0 ? (
+          <NavItem
+            href="/tickets"
+            icon="tickets"
+            label="Chamados"
+            count={openCount}
+            active={inTickets}
+          />
+        ) : (
+          operations.map((op) => (
+            <NavItem
+              key={op.id}
+              href={`/tickets?mailbox=${op.id}`}
+              icon="tickets"
+              label={op.name}
+              count={op.openCount}
+              // Com uma só operação o menu acompanha qualquer tela de chamados;
+              // com várias, só destaca a caixa que está filtrada.
+              active={
+                inTickets &&
+                (operations.length === 1 || activeMailbox === String(op.id))
+              }
+            />
+          ))
+        )}
 
         <div className="nav-section">Conhecimento</div>
         <NavItem

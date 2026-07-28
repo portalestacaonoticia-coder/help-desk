@@ -7,6 +7,7 @@ import { saveMailboxAction, testMailboxAction } from "@/app/actions";
 export type MailboxLite = {
   id: number;
   label: string;
+  operation: string | null;
   imapHost: string;
   imapPort: number;
   imapUser: string;
@@ -86,7 +87,7 @@ export default function MailboxManager({
               className={`macro-item${editing?.id === mb.id ? " selected" : ""}`}
             >
               <div className="head">
-                <strong>{mb.label}</strong>
+                <strong>{mb.operation || mb.label}</strong>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {mb.lastIngestStatus === "ok" && (
                     <span className="badge ok">Ingestão ok</span>
@@ -112,6 +113,10 @@ export default function MailboxManager({
               </div>
 
               <div className="prop-row" style={{ marginTop: 10 }}>
+                <span>Rótulo</span>
+                <strong>{mb.label}</strong>
+              </div>
+              <div className="prop-row">
                 <span>Última ingestão</span>
                 <strong>
                   {mb.lastIngestAt
@@ -147,11 +152,27 @@ export default function MailboxManager({
       {canEdit && (
         <div className="card props">
           <span className="card-title">
-            {editing ? `Editando ${editing.label}` : "Nova caixa"}
+            {editing
+              ? `Editando ${editing.operation || editing.label}`
+              : "Nova caixa"}
           </span>
 
           <form key={formKey} action={saveMailboxAction}>
             {editing && <input type="hidden" name="id" value={editing.id} />}
+
+            <div className="field">
+              <label htmlFor="operation">Operação</label>
+              <input
+                id="operation"
+                name="operation"
+                placeholder="Estação Finanças"
+                defaultValue={editing?.operation ?? ""}
+              />
+              <span className="hint">
+                Nome da operação que usa esta caixa. É o que aparece no menu
+                lateral; em branco, usa o rótulo.
+              </span>
+            </div>
 
             <div className="field">
               <label htmlFor="label">Rótulo</label>

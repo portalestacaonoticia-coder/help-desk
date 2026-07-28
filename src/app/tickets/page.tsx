@@ -7,7 +7,16 @@ import { STATUS_LABELS, colorClass, fmtRelative } from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
 
-type SP = { mailbox?: string; status?: string; q?: string };
+type SP = {
+  mailbox?: string;
+  status?: string;
+  q?: string;
+  page?: string;
+  per?: string;
+};
+
+const PER_OPTIONS = [10, 50, 100];
+const DEFAULT_PER = 50;
 
 export default async function TicketsPage({
   searchParams,
@@ -19,6 +28,12 @@ export default async function TicketsPage({
   const status = sp.status || null;
   const q = sp.q?.trim() || null;
 
+  const perRaw = Number(sp.per);
+  const perPage = PER_OPTIONS.includes(perRaw) ? perRaw : DEFAULT_PER;
+  const pageRaw = Number(sp.page);
+  const requestedPage =
+    Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+
   const conditions = [];
   if (mailboxId) conditions.push(eq(threads.mailboxId, mailboxId));
   if (status) conditions.push(eq(threads.status, status));
@@ -29,6 +44,16 @@ export default async function TicketsPage({
     );
   }
   const where = conditions.length ? and(...conditions) : undefined;
+
+  const [{ n: total }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(threads)
+    .innerJoin(mailboxes, eq(mailboxes.id, threads.mailboxId))
+    .where(where);
+
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * perPage;
 
   const rows = await db
     .select({
@@ -45,7 +70,8 @@ export default async function TicketsPage({
     .innerJoin(mailboxes, eq(mailboxes.id, threads.mailboxId))
     .where(where)
     .orderBy(desc(threads.lastMessageAt))
-    .limit(100);
+    .limit(perPage)
+    .offset(offset);
 
   // Prévia da última mensagem por thread (DISTINCT ON é eficiente no Postgres).
   const ids = rows.map((r) => r.id);
@@ -80,16 +106,35 @@ export default async function TicketsPage({
     .from(threads)
     .where(eq(threads.status, "aberto"));
 
-  function chipHref(next: Partial<SP>) {
+  function hrefWith(next: Partial<SP>) {
     const params = new URLSearchParams();
-    const merged = { mailbox: sp.mailbox, status: sp.status, q: sp.q, ...next };
+    const merged: SP = {
+      mailbox: sp.mailbox,
+      status: sp.status,
+      q: sp.q,
+      per: perPage === DEFAULT_PER ? undefined : String(perPage),
+      ...next,
+    };
     for (const [k, v] of Object.entries(merged)) if (v) params.set(k, v);
     const qs = params.toString();
     return qs ? `/tickets?${qs}` : "/tickets";
   }
 
+  // Trocar de filtro volta para a primeira página.
+  const chipHref = (next: Partial<SP>) => hrefWith({ ...next, page: undefined });
+  const pageHref = (p: number) => hrefWith({ page: p === 1 ? undefined : String(p) });
+
+  // Janela de páginas ao redor da atual (com "…" nas pontas).
+  const pageWindow: number[] = [];
+  for (let p = Math.max(1, page - 2); p <= Math.min(totalPages, page + 2); p++) {
+    pageWindow.push(p);
+  }
+
+  const firstItem = total === 0 ? 0 : offset + 1;
+  const lastItem = offset + rows.length;
+
   return (
-    <AppShell query={sp.q}>
+    <AppShell query={sp.q} mailbox={sp.mailbox}>
       <section className="page">
         <div className="page-head">
           <div>
@@ -122,6 +167,16 @@ export default async function TicketsPage({
                 <option key={v} value={v}>
                   {l}
                   {countByStatus.has(v) ? ` (${countByStatus.get(v)})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="f-per">Por página</label>
+            <select id="f-per" name="per" defaultValue={String(perPage)}>
+              {PER_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
                 </option>
               ))}
             </select>
@@ -191,6 +246,78 @@ export default async function TicketsPage({
               </Link>
             ))
           )}
+        </div>
+
+        <div className="pager">
+          <div className="pager-info">
+            {total === 0
+              ? "Nenhum resultado"
+              : `Mostrando ${firstItem}–${lastItem} de ${total}`}
+          </div>
+
+          <div className="pager-per">
+            <span className="pager-label">Por página</span>
+            {PER_OPTIONS.map((n) => (
+              <Link
+                key={n}
+                href={hrefWith({
+                  per: n === DEFAULT_PER ? undefined : String(n),
+                  page: undefined,
+                })}
+                className={`chip${n === perPage ? " active" : ""}`}
+              >
+                {n}
+              </Link>
+            ))}
+          </div>
+
+          <div className="pager-nav">
+            {page > 1 ? (
+              <Link href={pageHref(page - 1)} className="chip">
+                ← Anterior
+              </Link>
+            ) : (
+              <span className="chip disabled">← Anterior</span>
+            )}
+
+            {pageWindow[0] > 1 ? (
+              <>
+                <Link href={pageHref(1)} className="chip">
+                  1
+                </Link>
+                {pageWindow[0] > 2 ? <span className="pager-gap">…</span> : null}
+              </>
+            ) : null}
+
+            {pageWindow.map((p) => (
+              <Link
+                key={p}
+                href={pageHref(p)}
+                className={`chip${p === page ? " active" : ""}`}
+              >
+                {p}
+              </Link>
+            ))}
+
+            {pageWindow[pageWindow.length - 1] < totalPages ? (
+              <>
+                {pageWindow[pageWindow.length - 1] < totalPages - 1 ? (
+                  <span className="pager-gap">…</span>
+                ) : null}
+                <Link href={pageHref(totalPages)} className="chip">
+                  {totalPages}
+                </Link>
+              </>
+            ) : null}
+
+            {page < totalPages ? (
+              <Link href={pageHref(page + 1)} className="chip">
+                Próxima →
+              </Link>
+            ) : (
+              <span className="chip disabled">Próxima →</span>
+            )}
+          </div>
         </div>
       </section>
     </AppShell>

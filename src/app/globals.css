@@ -530,6 +530,47 @@ label {
 .chip.active:hover {
   color: #fff;
 }
+.chip.disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------- */
+/* Paginação                                                   */
+/* ---------------------------------------------------------- */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pager-info {
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
+.pager-per,
+.pager-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pager-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  margin-right: 2px;
+}
+.pager-gap {
+  padding: 0 2px;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
 
 /* ---------------------------------------------------------- */
 /* Tabela de chamados                                          */
