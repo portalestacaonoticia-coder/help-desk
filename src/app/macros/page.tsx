@@ -15,7 +15,8 @@ export default async function MacrosPage() {
           <div>
             <h1>Respostas prontas</h1>
             <p className="page-sub">
-              {list.length} macro{list.length === 1 ? "" : "s"} disponíve
+              {list.length} resposta{list.length === 1 ? "" : "s"} pronta
+              {list.length === 1 ? "" : "s"} disponíve
               {list.length === 1 ? "l" : "is"} para o time no atendimento.
             </p>
           </div>
@@ -23,9 +24,8 @@ export default async function MacrosPage() {
 
         <div className="macro-grid">
           <div className="card">
-            <div className="card-head">Macros do time</div>
             {list.length === 0 ? (
-              <div className="empty">Nenhuma macro cadastrada.</div>
+              <div className="empty">Nenhuma resposta pronta cadastrada.</div>
             ) : (
               list.map((m) => (
                 <div key={m.id} className="macro-item">
@@ -40,7 +40,7 @@ export default async function MacrosPage() {
           </div>
 
           <div className="card props">
-            <span className="card-title">Nova macro</span>
+            <span className="card-title">Nova resposta pronta</span>
             <form action={createMacroAction}>
               <div className="field">
                 <label htmlFor="title">Título</label>
@@ -55,7 +55,7 @@ export default async function MacrosPage() {
                 <textarea id="body" name="body" required style={{ minHeight: 140 }} />
               </div>
               <button type="submit" className="primary" style={{ width: "100%" }}>
-                Criar macro
+                Criar
               </button>
             </form>
           </div>
