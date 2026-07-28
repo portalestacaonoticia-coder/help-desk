@@ -123,9 +123,9 @@ export default async function BasePage() {
               {settings.autoSendEnabled ? (
                 <>
                   <strong>Envio automático LIGADO.</strong> E-mails saem para o
-                  cliente sem ninguém revisar, em qualquer categoria. A única
-                  barreira que resta é a própria IA sinalizar que o caso precisa
-                  de um humano.
+                  cliente sem ninguém revisar, em qualquer categoria. Cada
+                  resposta só sai se a IA liberar explicitamente; qualquer
+                  hesitação, erro ou resposta inesperada dela vira rascunho.
                 </>
               ) : (
                 <>

@@ -43,6 +43,12 @@ export type Suggestion = {
   resposta: string;
   artigos_usados: number[];
   precisa_humano: boolean;
+  /**
+   * Liberação EXPLÍCITA para enviar sem revisão. Falta do campo, valor
+   * diferente de `true` ou json malformado deixam isto `false` — a falha
+   * empurra para o rascunho, nunca para o envio.
+   */
+  posso_enviar: boolean;
 };
 
 /**
@@ -221,13 +227,21 @@ Responda APENAS com um objeto json neste formato exato:
   "resumo": "uma frase sobre o que o cliente precisa",
   "resposta": "o corpo do e-mail, terminando na última frase útil — sem despedida e sem assinatura",
   "artigos_usados": [1, 2],
-  "precisa_humano": false
+  "precisa_humano": false,
+  "posso_enviar": false
 }
 
 "confianca" é um número entre 0 e 1 indicando o quanto você tem certeza de que
 a resposta resolve o problema com base nos artigos acima. Use "precisa_humano":
 true sempre que os artigos não cobrirem o caso, o cliente estiver irritado, ou o
-pedido envolver exceção, prazo, valor ou acesso privilegiado.`;
+pedido envolver exceção, prazo, valor ou acesso privilegiado.
+
+"posso_enviar" é a sua liberação para esta resposta ir ao cliente SEM nenhuma
+revisão humana. O padrão é false. Só marque true quando TODAS forem verdade:
+o material acima cobre o caso por completo; a resposta não contém nada que você
+tenha inferido ou suposto; não há valor, prazo, exceção ou dado de conta
+envolvido; e você reenviaria essa mensagem exatamente assim se fosse o
+responsável pela conta. Na menor hesitação, deixe false.`;
 }
 
 function buildUserPrompt(
@@ -269,6 +283,9 @@ function normalizeSuggestion(raw: unknown): Suggestion {
       ? o.artigos_usados.map(Number).filter(Number.isInteger)
       : [],
     precisa_humano: o.precisa_humano === true,
+    // Comparação estrita de propósito: só um `true` literal libera. Campo
+    // ausente, "true" como string ou 1 continuam barrando o envio.
+    posso_enviar: o.posso_enviar === true,
   };
 }
 
@@ -355,10 +372,12 @@ export async function suggestReplyForMessage(messageId: number): Promise<{
     // card não passar segurança que o próprio modelo disse não ter.
     const confianca = s.precisa_humano ? Math.min(s.confianca, 0.4) : s.confianca;
 
-    // Envio automático: trava mestra ligada e o modelo não ter pedido um
-    // humano. Sem recorte por categoria — vale para qualquer uma.
+    // Envio automático. A liberação é OPT-IN do modelo: `posso_enviar` precisa
+    // vir true explicitamente. Json quebrado, campo ausente ou resposta
+    // inesperada caem no rascunho — a falha nunca resulta em e-mail enviado.
     const podeAutoEnviar =
       settings.autoSendEnabled &&
+      s.posso_enviar &&
       !s.precisa_humano &&
       s.resposta.trim().length > 0;
 
