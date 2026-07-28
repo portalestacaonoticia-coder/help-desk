@@ -210,13 +210,11 @@ export async function createCategoryAction(formData: FormData) {
   await requireUser();
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
-  const autoRespondivel = formData.get("autoRespondivel") === "on";
-
   if (!name) throw new Error("Nome da categoria é obrigatório");
 
   await db
     .insert(categories)
-    .values({ name, description, autoRespondivel })
+    .values({ name, description })
     .onConflictDoNothing();
   revalidatePath("/base");
 }
@@ -227,16 +225,8 @@ export async function toggleCategoryAction(formData: FormData) {
   const field = String(formData.get("field") ?? "");
   const value = String(formData.get("value") ?? "") === "true";
 
-  if (field === "active") {
-    await db.update(categories).set({ active: value }).where(eq(categories.id, id));
-  } else if (field === "autoRespondivel") {
-    await db
-      .update(categories)
-      .set({ autoRespondivel: value })
-      .where(eq(categories.id, id));
-  } else {
-    throw new Error("Campo inválido");
-  }
+  if (field !== "active") throw new Error("Campo inválido");
+  await db.update(categories).set({ active: value }).where(eq(categories.id, id));
   revalidatePath("/base");
 }
 

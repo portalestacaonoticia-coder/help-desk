@@ -5,12 +5,14 @@ import {
   aiSettings,
   categories,
   knowledgeBase,
+  mailboxes,
   messages,
   threads,
   type AiSettings,
   type KbArticle,
 } from "@/db/schema";
 import { chatJson, DeepSeekError, isAiConfigured, DEFAULT_MODEL } from "@/lib/deepseek";
+import { sendReply } from "@/lib/smtp";
 
 /** Prompt base usado enquanto a equipe não escrever o seu na tela da KB. */
 export const DEFAULT_BASE_PROMPT = `Você é um agente de suporte da Tihee respondendo e-mails de clientes internos.
@@ -52,6 +54,7 @@ const FALLBACK_SETTINGS: AiSettings = {
   enabled: false,
   model: DEFAULT_MODEL,
   basePrompt: DEFAULT_BASE_PROMPT,
+  autoSendPrompt: "",
   autoSendEnabled: false,
   updatedAt: new Date(0),
 };
@@ -196,7 +199,13 @@ function buildSystemPrompt(
         .join("\n\n")
     : "(nenhum artigo relevante encontrado na base)";
 
-  return `${base}
+  // Só entra quando a resposta vai de fato sair sem ninguém olhar.
+  const autoBlock =
+    settings.autoSendEnabled && settings.autoSendPrompt.trim()
+      ? `\n\n## Envio automático (esta resposta vai ao cliente SEM revisão humana)\n${settings.autoSendPrompt.trim()}`
+      : "";
+
+  return `${base}${autoBlock}
 
 ## Categorias disponíveis
 ${categoryBlock}
@@ -346,6 +355,38 @@ export async function suggestReplyForMessage(messageId: number): Promise<{
     // card não passar segurança que o próprio modelo disse não ter.
     const confianca = s.precisa_humano ? Math.min(s.confianca, 0.4) : s.confianca;
 
+    // Envio automático: trava mestra ligada e o modelo não ter pedido um
+    // humano. Sem recorte por categoria — vale para qualquer uma.
+    const podeAutoEnviar =
+      settings.autoSendEnabled &&
+      !s.precisa_humano &&
+      s.resposta.trim().length > 0;
+
+    let actionTaken = "sugerido";
+    let autoSendError: string | null = null;
+
+    if (podeAutoEnviar) {
+      try {
+        const [mb] = await db
+          .select({ signature: mailboxes.signature })
+          .from(mailboxes)
+          .where(eq(mailboxes.id, msg.mailboxId))
+          .limit(1);
+        const assinatura = mb?.signature?.trim();
+
+        await sendReply({
+          threadId: msg.threadId,
+          bodyText: assinatura ? `${s.resposta}\n\n${assinatura}` : s.resposta,
+          sentByUserId: null, // null = IA/sistema, não um agente
+        });
+        actionTaken = "auto_enviado";
+      } catch (err) {
+        // Falha de SMTP não derruba a análise: o rascunho continua salvo e o
+        // agente envia na mão.
+        autoSendError = err instanceof Error ? err.message : String(err);
+      }
+    }
+
     await db
       .insert(aiActions)
       .values({
@@ -353,14 +394,15 @@ export async function suggestReplyForMessage(messageId: number): Promise<{
         threadId: msg.threadId,
         categorySuggested: categoria,
         confidence: confianca,
-        actionTaken: "sugerido",
+        actionTaken,
         responseSent: s.resposta,
         summary: s.resumo,
         sourceArticleIds: s.artigos_usados.join(","),
         model: result.model,
         promptTokens: result.promptTokens,
         completionTokens: result.completionTokens,
-        status: "pendente",
+        errorMessage: autoSendError?.slice(0, 1000) ?? null,
+        status: actionTaken === "auto_enviado" ? "usada" : "pendente",
       })
       .onConflictDoNothing();
 

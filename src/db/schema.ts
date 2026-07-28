@@ -209,6 +209,10 @@ export const aiSettings = pgTable("ai_settings", {
   enabled: boolean("enabled").notNull().default(true),
   model: text("model").notNull().default("deepseek-v4-flash"),
   basePrompt: text("base_prompt").notNull().default(""),
+  // Instruções extras que a IA segue APENAS quando vai enviar sozinha. Ficam
+  // separadas do prompt base de propósito: as regras de quem responde sem
+  // revisão precisam ser mais estritas que as de quem só rascunha.
+  autoSendPrompt: text("auto_send_prompt").notNull().default(""),
   // Trava mestra do envio automático. Off = tudo vira rascunho para revisão.
   autoSendEnabled: boolean("auto_send_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

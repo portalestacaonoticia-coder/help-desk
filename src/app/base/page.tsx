@@ -25,7 +25,6 @@ export default async function BasePage() {
       id: categories.id,
       name: categories.name,
       description: categories.description,
-      autoRespondivel: categories.autoRespondivel,
       active: categories.active,
     })
     .from(categories)
@@ -98,10 +97,61 @@ export default async function BasePage() {
               <span>Gerar rascunhos automaticamente ao receber e-mails</span>
             </label>
 
-            <div className="callout" style={{ marginTop: 14 }}>
-              A IA nunca envia e-mail sozinha: ela só prepara o rascunho, e o
-              envio continua sendo um clique do agente no chamado. A assinatura
-              é definida por caixa, em Caixas de e-mail.
+            <div className="hr" style={{ margin: "20px 0" }} />
+
+            <div style={{ marginBottom: 12 }}>
+              <div className="card-title">Envio automático</div>
+              <p className="page-sub" style={{ fontSize: 13 }}>
+                Instruções que a IA segue quando responde sozinha, somadas ao
+                prompt base. Só valem quando o envio automático está ligado.
+              </p>
+            </div>
+
+            <div className="field">
+              <label htmlFor="autoSendPrompt">Prompt do envio automático</label>
+              <textarea
+                id="autoSendPrompt"
+                name="autoSendPrompt"
+                style={{ minHeight: 140 }}
+                placeholder={
+                  "- Responda apenas o que estiver coberto pelo material da operação.\n" +
+                  "- Na menor dúvida, marque precisa_humano: true em vez de responder.\n" +
+                  "- Nunca cite valores, prazos ou condições que não estejam no material."
+                }
+                defaultValue={settings.autoSendPrompt}
+                disabled={!isAdmin}
+              />
+            </div>
+
+            <label className="check">
+              <input
+                type="checkbox"
+                name="autoSendEnabled"
+                defaultChecked={settings.autoSendEnabled}
+                disabled={!isAdmin}
+              />
+              <span>
+                Enviar automaticamente, sem aprovação
+              </span>
+            </label>
+
+            <div
+              className={`callout ${settings.autoSendEnabled ? "danger" : "warn"}`}
+              style={{ marginTop: 14 }}
+            >
+              {settings.autoSendEnabled ? (
+                <>
+                  <strong>Envio automático LIGADO.</strong> E-mails saem para o
+                  cliente sem ninguém revisar, em qualquer categoria. A única
+                  barreira que resta é a própria IA sinalizar que o caso precisa
+                  de um humano.
+                </>
+              ) : (
+                <>
+                  <strong>Envio automático desligado.</strong> A IA só prepara o
+                  rascunho; o envio é um clique do agente no chamado.
+                </>
+              )}
             </div>
 
             {isAdmin ? (
@@ -131,9 +181,6 @@ export default async function BasePage() {
                   <div className="head">
                     <strong>{c.name}</strong>
                     <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {c.autoRespondivel && (
-                        <span className="badge ok">Auto-respondível</span>
-                      )}
                       {!c.active && <span className="badge neutral">Inativa</span>}
                     </span>
                   </div>
@@ -144,20 +191,6 @@ export default async function BasePage() {
                       <input type="hidden" name="field" value="active" />
                       <input type="hidden" name="value" value={String(!c.active)} />
                       <button type="submit">{c.active ? "Desativar" : "Ativar"}</button>
-                    </form>
-                    <form action={toggleCategoryAction}>
-                      <input type="hidden" name="id" value={c.id} />
-                      <input type="hidden" name="field" value="autoRespondivel" />
-                      <input
-                        type="hidden"
-                        name="value"
-                        value={String(!c.autoRespondivel)}
-                      />
-                      <button type="submit">
-                        {c.autoRespondivel
-                          ? "Tirar auto-resposta"
-                          : "Marcar auto-respondível"}
-                      </button>
                     </form>
                   </div>
                 </div>
@@ -184,10 +217,6 @@ export default async function BasePage() {
                   É o texto que a IA lê para decidir a classificação.
                 </span>
               </div>
-              <label className="check">
-                <input type="checkbox" name="autoRespondivel" />
-                <span>Liberar para envio automático</span>
-              </label>
               <button type="submit" className="primary" style={{ width: "100%", marginTop: 12 }}>
                 Criar categoria
               </button>
