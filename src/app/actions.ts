@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { AuthError } from "next-auth";
 import { auth, signIn, signOut } from "@/lib/auth";
 import { db } from "@/db";
 import {
   threads,
+  messages,
   macros,
   categories,
   knowledgeBase,
@@ -116,6 +117,67 @@ export async function setStatusAction(formData: FormData) {
   await db.update(threads).set({ status }).where(eq(threads.id, threadId));
 
   revalidatePath(`/tickets/${threadId}`);
+  revalidatePath("/tickets");
+}
+
+/**
+ * Define a categoria do chamado. Aceita vazio para "sem categoria" e só grava
+ * nomes que existem em `categories` e estão ativos — o valor vem de um select,
+ * mas a validação não pode confiar no cliente.
+ */
+export async function setCategoryAction(formData: FormData) {
+  await requireUser();
+  const threadId = Number(formData.get("threadId"));
+  const category = String(formData.get("category") ?? "").trim();
+
+  if (category) {
+    const [known] = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.name, category), eq(categories.active, true)))
+      .limit(1);
+    if (!known) throw new Error("Categoria inválida");
+  }
+
+  await db
+    .update(threads)
+    .set({ category: category || null })
+    .where(eq(threads.id, threadId));
+
+  revalidatePath(`/tickets/${threadId}`);
+  revalidatePath("/tickets");
+}
+
+/**
+ * Remove chamados em lote. DESTRUTIVO e sem desfazer: apaga também as
+ * mensagens e as análises da IA de cada thread.
+ *
+ * A ordem importa por causa das FKs: ai_actions aponta para messages e para
+ * threads, e messages aponta para threads.
+ */
+export async function deleteThreadsAction(formData: FormData) {
+  await requireAdmin();
+
+  const ids = formData
+    .getAll("ids")
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (ids.length === 0) return;
+
+  const msgIds = (
+    await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(inArray(messages.threadId, ids))
+  ).map((m) => m.id);
+
+  if (msgIds.length > 0) {
+    await db.delete(aiActions).where(inArray(aiActions.messageId, msgIds));
+  }
+  await db.delete(aiActions).where(inArray(aiActions.threadId, ids));
+  await db.delete(messages).where(inArray(messages.threadId, ids));
+  await db.delete(threads).where(inArray(threads.id, ids));
+
   revalidatePath("/tickets");
 }
 

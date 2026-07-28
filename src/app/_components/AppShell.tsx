@@ -25,6 +25,15 @@ export default async function AppShell({
     .from(threads)
     .where(eq(threads.status, "aberto"));
 
+  // Respostas criadas hoje. O corte é a meia-noite de São Paulo, não do UTC
+  // em que o servidor roda — senão o "dia" vira às 21h.
+  const [{ n: todayCount }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(threads)
+    .where(
+      sql`${threads.createdAt} >= (date_trunc('day', now() at time zone 'America/Sao_Paulo')) at time zone 'America/Sao_Paulo'`,
+    );
+
   // Uma entrada de menu por operação (caixa ativa), com sua fila em aberto.
   //
   // Correlação por leftJoin, não por subquery em template `sql`: dentro do
@@ -50,6 +59,7 @@ export default async function AppShell({
     <div className="shell">
       <Sidebar
         openCount={openCount}
+        todayCount={todayCount}
         operations={operations}
         activeMailbox={mailbox ?? null}
         agentName={name}

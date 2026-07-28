@@ -22,6 +22,9 @@ export type MailboxLite = {
   lastIngestAt: Date | string | null;
   lastIngestStatus: string | null;
   lastIngestMessage: string | null;
+  lastOkAt: Date | string | null;
+  /** Última tentativa falhou, mas houve entrada bem-sucedida recente. */
+  flaky: boolean;
   threadCount: number;
 };
 
@@ -92,7 +95,8 @@ export default function MailboxManager({
                   {mb.lastIngestStatus === "ok" && (
                     <span className="badge ok">Ingestão ok</span>
                   )}
-                  {mb.lastIngestStatus === "error" && (
+                  {mb.flaky && <span className="badge neutral">Instável</span>}
+                  {mb.lastIngestStatus === "error" && !mb.flaky && (
                     <span className="badge st-erro">Erro</span>
                   )}
                   {!mb.lastIngestStatus && (
@@ -125,7 +129,7 @@ export default function MailboxManager({
                 </strong>
               </div>
               <div className="prop-row">
-                <span>Chamados</span>
+                <span>Respostas</span>
                 <strong>{mb.threadCount}</strong>
               </div>
               <div className="prop-row">
@@ -133,8 +137,20 @@ export default function MailboxManager({
                 <strong className="mono">{mb.lastUid}</strong>
               </div>
 
+              <div className="prop-row">
+                <span>Última entrada ok</span>
+                <strong>
+                  {mb.lastOkAt
+                    ? new Date(mb.lastOkAt).toLocaleString("pt-BR")
+                    : "nunca"}
+                </strong>
+              </div>
+
               {mb.lastIngestStatus === "error" && mb.lastIngestMessage && (
-                <div className="callout danger" style={{ marginTop: 10 }}>
+                <div
+                  className={`callout ${mb.flaky ? "warn" : "danger"}`}
+                  style={{ marginTop: 10 }}
+                >
                   {mb.lastIngestMessage}
                 </div>
               )}

@@ -45,7 +45,7 @@ function NavItem({
       >
         {ICONS[icon]}
       </svg>
-      <span>{label}</span>
+      <span className="nav-label">{label}</span>
       {count ? <span className="nav-count">{count}</span> : null}
     </Link>
   );
@@ -59,6 +59,7 @@ export type OperationNav = {
 
 export default function Sidebar({
   openCount,
+  todayCount,
   operations,
   activeMailbox,
   agentName,
@@ -66,6 +67,7 @@ export default function Sidebar({
   agentRole,
 }: {
   openCount: number;
+  todayCount: number;
   operations: OperationNav[];
   activeMailbox: string | null;
   agentName: string;
@@ -94,7 +96,7 @@ export default function Sidebar({
           <NavItem
             href="/tickets"
             icon="tickets"
-            label="Chamados"
+            label="Respostas"
             count={openCount}
             active={inTickets}
           />
@@ -155,10 +157,10 @@ export default function Sidebar({
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            <span>Fila do turno</span>
+            <span>Total de respostas</span>
           </div>
-          <div className="num">{openCount}</div>
-          <div className="sub">chamados aguardando atendimento</div>
+          <div className="num">{todayCount}</div>
+          <div className="sub">criadas hoje</div>
         </div>
 
         <div className="agent">

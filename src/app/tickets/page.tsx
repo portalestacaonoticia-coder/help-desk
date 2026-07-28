@@ -3,7 +3,9 @@ import { and, eq, ilike, or, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { threads, mailboxes, messages } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
-import { STATUS_LABELS, colorClass, fmtRelative } from "@/lib/ui";
+import TicketTable from "./_components/TicketTable";
+import { auth } from "@/lib/auth";
+import { STATUS_LABELS } from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,10 @@ export default async function TicketsPage({
   searchParams: Promise<SP>;
 }) {
   const sp = await searchParams;
+  // Remoção é destrutiva e sem desfazer: só administrador.
+  const session = await auth();
+  const canDelete = session?.user?.role === "admin";
+
   const mailboxId = sp.mailbox ? Number(sp.mailbox) : null;
   const status = sp.status || null;
   const q = sp.q?.trim() || null;
@@ -64,7 +70,7 @@ export default async function TicketsPage({
       category: threads.category,
       lastMessageAt: threads.lastMessageAt,
       mailboxId: threads.mailboxId,
-      mailboxLabel: mailboxes.label,
+      mailboxLabel: sql<string>`coalesce(nullif(${mailboxes.operation}, ''), ${mailboxes.label})`,
     })
     .from(threads)
     .innerJoin(mailboxes, eq(mailboxes.id, threads.mailboxId))
@@ -89,7 +95,11 @@ export default async function TicketsPage({
   }
 
   const mbList = await db
-    .select({ id: mailboxes.id, label: mailboxes.label })
+    .select({
+      id: mailboxes.id,
+      label: mailboxes.label,
+      operation: mailboxes.operation,
+    })
     .from(mailboxes)
     .orderBy(mailboxes.label);
 
@@ -138,9 +148,9 @@ export default async function TicketsPage({
       <section className="page">
         <div className="page-head">
           <div>
-            <h1>Fila de chamados</h1>
+            <h1>Fila de respostas</h1>
             <p className="page-sub">
-              {openTotal} chamado{openTotal === 1 ? "" : "s"} em aberto no
+              {openTotal} resposta{openTotal === 1 ? "" : "s"} em aberto no
               ecossistema Tihee.
             </p>
           </div>
@@ -154,7 +164,7 @@ export default async function TicketsPage({
               <option value="">Todas</option>
               {mbList.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.label}
+                  {m.operation || m.label}
                 </option>
               ))}
             </select>
@@ -204,49 +214,10 @@ export default async function TicketsPage({
           ))}
         </div>
 
-        <div className="card table">
-          <div className="trow thead">
-            <div>ID</div>
-            <div>Assunto</div>
-            <div>Caixa</div>
-            <div className="col-hide">Categoria</div>
-            <div>Status</div>
-          </div>
-
-          {rows.length === 0 ? (
-            <div className="empty">
-              Nenhum chamado encontrado. Assim que a ingestão IMAP rodar, os
-              e-mails aparecem aqui.
-            </div>
-          ) : (
-            rows.map((t) => (
-              <Link key={t.id} href={`/tickets/${t.id}`} className="trow">
-                <div className="mono t-meta">#{t.id}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div className="t-subject">{t.subject || "(sem assunto)"}</div>
-                  <div className="t-preview">
-                    {t.customerAddr ? `${t.customerAddr} · ` : ""}
-                    {fmtRelative(t.lastMessageAt)}
-                    {previews.get(t.id) ? ` · ${previews.get(t.id)}` : ""}
-                  </div>
-                </div>
-                <div>
-                  <span className={`tag ${colorClass(t.mailboxId)}`}>
-                    {t.mailboxLabel}
-                  </span>
-                </div>
-                <div className="col-hide">
-                  {t.category ? <span className="pill">{t.category}</span> : <span className="t-meta">—</span>}
-                </div>
-                <div>
-                  <span className={`badge st-${t.status}`}>
-                    {STATUS_LABELS[t.status] ?? t.status}
-                  </span>
-                </div>
-              </Link>
-            ))
-          )}
-        </div>
+        <TicketTable
+          canDelete={canDelete}
+          rows={rows.map((t) => ({ ...t, preview: previews.get(t.id) ?? "" }))}
+        />
 
         <div className="pager">
           <div className="pager-info">

@@ -20,7 +20,7 @@ export default function Topbar({ query }: { query?: string }) {
         <input
           name="q"
           defaultValue={query ?? ""}
-          placeholder="Buscar chamado, assunto ou cliente"
+          placeholder="Buscar resposta, assunto ou cliente"
           aria-label="Buscar"
         />
       </form>

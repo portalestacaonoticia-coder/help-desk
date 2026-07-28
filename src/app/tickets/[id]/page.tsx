@@ -2,10 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/db";
-import { threads, mailboxes, messages, macros } from "@/db/schema";
+import { threads, mailboxes, messages, macros, categories } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
 import ReplyArea from "./_components/ReplyArea";
-import { setStatusAction } from "@/app/actions";
+import { setStatusAction, setCategoryAction } from "@/app/actions";
 import {
   getAiSettingsSafe,
   getLatestSuggestion,
@@ -44,11 +44,20 @@ export default async function TicketPage({
     .where(eq(mailboxes.id, thread.mailboxId))
     .limit(1);
 
+  // Sem operação definida, cai no rótulo da caixa.
+  const operationName = mailbox?.operation || mailbox?.label || "—";
+
   const msgs = await db
     .select()
     .from(messages)
     .where(eq(messages.threadId, threadId))
     .orderBy(asc(messages.createdAt));
+
+  const categoryList = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(eq(categories.active, true))
+    .orderBy(categories.name);
 
   const macroList = await db
     .select({
@@ -90,14 +99,14 @@ export default async function TicketPage({
       <section className="page">
         <div>
           <div className="breadcrumb">
-            <Link href="/tickets">Chamados</Link>
+            <Link href="/tickets">Respostas</Link>
             <span>/</span>
             <span className="mono">#{thread.id}</span>
           </div>
           <h1 style={{ fontSize: 26 }}>{thread.subject || "(sem assunto)"}</h1>
           <div className="chips" style={{ marginTop: 12 }}>
             <span className={`tag ${colorClass(thread.mailboxId)}`}>
-              {mailbox?.label}
+              {operationName}
             </span>
             <span className={`badge st-${thread.status}`}>
               {STATUS_LABELS[thread.status] ?? thread.status}
@@ -174,15 +183,33 @@ export default async function TicketPage({
 
               <div className="hr" />
 
+              <form action={setCategoryAction} style={{ marginTop: 14 }}>
+                <input type="hidden" name="threadId" value={threadId} />
+                <label htmlFor="category">Categoria</label>
+                <select
+                  id="category"
+                  name="category"
+                  defaultValue={thread.category ?? ""}
+                >
+                  <option value="">Sem categoria</option>
+                  {categoryList.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" style={{ marginTop: 8, width: "100%" }}>
+                  Atualizar categoria
+                </button>
+              </form>
+
+              <div className="hr" />
+
               <div className="prop-row">
-                <span>Caixa</span>
+                <span>Operação</span>
                 <span className={`tag ${colorClass(thread.mailboxId)}`}>
-                  {mailbox?.label}
+                  {operationName}
                 </span>
-              </div>
-              <div className="prop-row">
-                <span>Categoria</span>
-                <strong>{thread.category ?? "—"}</strong>
               </div>
               <div className="prop-row">
                 <span>Criado</span>
@@ -195,12 +222,11 @@ export default async function TicketPage({
             </div>
 
             <div className="card props">
-              <span className="card-title">Solicitante</span>
+              <span className="card-title">Contato</span>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div className="avatar lg plain">{initials(thread.customerAddr)}</div>
                 <div className="agent-name">
                   <strong>{thread.customerAddr ?? "—"}</strong>
-                  <span>{mailbox?.label ?? "—"}</span>
                 </div>
               </div>
             </div>

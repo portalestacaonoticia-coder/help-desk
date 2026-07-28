@@ -52,7 +52,7 @@ export default function Error({
             Tentar de novo
           </button>
           <a href="/tickets" className="btn">
-            Voltar para os chamados
+            Voltar para as respostas
           </a>
         </div>
       </div>

@@ -171,17 +171,29 @@ a:hover {
 .nav-item svg {
   flex: 0 0 18px;
 }
-.nav-item span {
+.nav-label {
   flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+  /* Nome de operação longo quebra em até 2 linhas, depois corta. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .nav-count {
+  /* Precisa vir depois de .nav-label: `.nav-item span` esticava a pílula. */
   flex: 0 0 auto;
+  align-self: center;
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 7px;
+  /* line-height fixo + padding simétrico = número centrado na pílula. */
+  line-height: 1;
+  padding: 5px 8px;
   border-radius: 999px;
   background: hsl(var(--primary));
   color: #fff;
+  font-variant-numeric: tabular-nums;
 }
 
 .sidebar-foot {
@@ -590,6 +602,59 @@ label {
 }
 .trow:last-child {
   border-bottom: none;
+}
+/* Coluna extra do checkbox quando a remoção em lote está disponível. */
+.trow.selectable {
+  grid-template-columns: 34px 76px minmax(0, 1fr) 110px 120px 150px;
+}
+.trow.selected {
+  background: hsl(var(--accent) / 0.6);
+}
+.trow input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: hsl(var(--primary));
+  cursor: pointer;
+}
+/* A linha virou div com links dentro — o hover fica na linha inteira. */
+.trow:has(a):hover {
+  background: hsl(var(--accent) / 0.5);
+}
+.trow > a {
+  color: inherit;
+  min-width: 0;
+}
+.trow > a:hover {
+  color: inherit;
+}
+
+.bulkbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: hsl(var(--accent));
+  border: 1px solid hsl(var(--primary) / 0.2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.bulkbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+button.danger {
+  background: hsl(var(--destructive, 0 72% 51%));
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+button.danger:hover:not(:disabled) {
+  filter: brightness(0.93);
 }
 .thead {
   padding: 14px 24px;

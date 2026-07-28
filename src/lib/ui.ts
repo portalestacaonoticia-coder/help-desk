@@ -20,10 +20,16 @@ export function colorClass(id: number | null | undefined): string {
   return `c${((id ?? 0) % 6) + 1}`;
 }
 
+// Estas datas são formatadas no servidor, que na Vercel roda em UTC. Sem fixar
+// o fuso, um chamado criado 14:15 aparecia como 17:15 — três horas à frente,
+// muitas vezes "no futuro" em relação ao relógio de quem olha.
+const TIMEZONE = "America/Sao_Paulo";
+
 export function fmtDateTime(d: Date | string | null): string {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   return date.toLocaleString("pt-BR", {
+    timeZone: TIMEZONE,
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

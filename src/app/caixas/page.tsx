@@ -58,18 +58,46 @@ export default async function MailboxesPage() {
     [...logRows].map((r) => [Number(r.mailbox_id), r]),
   );
 
+  // Última execução BEM-SUCEDIDA por caixa. É esse o sinal de saúde: desde que
+  // a ingestão passou a gravar o ponteiro por lote, uma rodada que falha não
+  // perde o progresso — a seguinte continua de onde parou. Alarmar por causa
+  // do status da última tentativa dá falso positivo com erro intermitente.
+  const okRows = await db.execute<{ mailbox_id: number; created_at: string }>(
+    sql`select distinct on (mailbox_id) mailbox_id, created_at
+        from ${ingestLogs}
+        where mailbox_id is not null and status = 'ok'
+        order by mailbox_id, created_at desc`,
+  );
+  const lastOkByMailbox = new Map(
+    [...okRows].map((r) => [Number(r.mailbox_id), new Date(r.created_at)]),
+  );
+
+  // Sem nenhuma entrada bem-sucedida nesse intervalo, a caixa está de fato
+  // parada e o alarme vermelho se justifica.
+  const STALL_THRESHOLD_MS = 6 * 60 * 60 * 1000;
+  const now = Date.now();
+
   const rows = boxes.map((b) => {
     const log = logByMailbox.get(b.id);
+    const lastOkAt = lastOkByMailbox.get(b.id) ?? null;
     return {
       ...b,
       threadCount: countByMailbox.get(b.id) ?? 0,
       lastIngestAt: log ? new Date(log.created_at) : null,
       lastIngestStatus: log?.status ?? null,
       lastIngestMessage: log?.message ?? null,
+      lastOkAt,
+      // Errou agora, mas entrou e-mail há pouco: instabilidade, não parada.
+      flaky:
+        log?.status === "error" &&
+        lastOkAt !== null &&
+        now - lastOkAt.getTime() <= STALL_THRESHOLD_MS,
     };
   });
 
-  const failing = rows.filter((r) => r.lastIngestStatus === "error");
+  // Parada de verdade: última tentativa falhou e não há sucesso recente.
+  const stalled = rows.filter((r) => r.lastIngestStatus === "error" && !r.flaky);
+  const flaky = rows.filter((r) => r.flaky);
   // Ordena por tempo de verdade: o sort padrão compara datas como string.
   const lastRun = rows
     .map((r) => (r.lastIngestAt ? new Date(r.lastIngestAt) : null))
@@ -92,14 +120,26 @@ export default async function MailboxesPage() {
           </div>
         </div>
 
-        {failing.length > 0 && (
+        {stalled.length > 0 && (
           <div className="callout danger">
             <strong>
-              {failing.length} caixa{failing.length === 1 ? "" : "s"} com falha na
-              última ingestão:
+              {stalled.length} caixa{stalled.length === 1 ? "" : "s"} sem
+              ingestão bem-sucedida:
             </strong>{" "}
-            {failing.map((f) => f.label).join(", ")}. E-mails novos dessas caixas
-            não estão entrando.
+            {stalled.map((f) => f.operation || f.label).join(", ")}. E-mails
+            novos dessas caixas não estão entrando.
+          </div>
+        )}
+
+        {flaky.length > 0 && (
+          <div className="callout warn">
+            <strong>
+              {flaky.length} caixa{flaky.length === 1 ? "" : "s"} com falha na
+              última tentativa:
+            </strong>{" "}
+            {flaky.map((f) => f.operation || f.label).join(", ")}. A ingestão
+            continua entrando — a última rodada caiu no meio, mas o ponteiro
+            fica salvo e a próxima retoma de onde parou.
           </div>
         )}
 

@@ -35,14 +35,15 @@ const CHECKPOINT_EVERY = 20;
 
 /**
  * Encontra (ou cria) a thread à qual uma mensagem recebida pertence.
- * Retorna o id da thread.
+ * `created` diz se a thread nasceu agora — quem chama precisa saber para
+ * desfazer a criação se a mensagem acabar não entrando.
  */
 async function resolveThread(params: {
   mailboxId: number;
   subject: string | null;
   customerAddr: string | null;
   referencedIds: string[];
-}): Promise<number> {
+}): Promise<{ id: number; created: boolean }> {
   const { mailboxId, subject, customerAddr, referencedIds } = params;
 
   // 1) Por In-Reply-To / References: alguma mensagem conhecida com esse Message-ID?
@@ -57,7 +58,7 @@ async function resolveThread(params: {
         ),
       )
       .limit(1);
-    if (parent.length > 0) return parent[0].threadId;
+    if (parent.length > 0) return { id: parent[0].threadId, created: false };
   }
 
   // 2) Por assunto normalizado + mesmo cliente, na mesma caixa, recente.
@@ -79,7 +80,7 @@ async function resolveThread(params: {
       )
       .orderBy(desc(threads.lastMessageAt))
       .limit(1);
-    if (existing.length > 0) return existing[0].id;
+    if (existing.length > 0) return { id: existing[0].id, created: false };
   }
 
   // 3) Nova thread.
@@ -93,7 +94,7 @@ async function resolveThread(params: {
       status: "aberto",
     })
     .returning({ id: threads.id });
-  return created.id;
+  return { id: created.id, created: true };
 }
 
 /** Converte um e-mail parseado em uma linha de `messages` (sem thread ainda). */
@@ -218,18 +219,46 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
             row.referencesHeader,
           );
 
-          const threadId = await resolveThread({
+          // Segunda checagem de idempotência, agora por Message-ID: a mesma
+          // mensagem pode aparecer em dois UIDs. Sem isto o thread nasce, o
+          // insert bate no índice único e sobra um chamado com 0 mensagens.
+          if (row.messageIdHeader) {
+            const dup = await db
+              .select({ id: messages.id })
+              .from(messages)
+              .where(
+                and(
+                  eq(messages.mailboxId, mb.id),
+                  eq(messages.messageIdHeader, row.messageIdHeader),
+                ),
+              )
+              .limit(1);
+            if (dup.length > 0) {
+              if (uid > maxUid) maxUid = uid;
+              if (processed % CHECKPOINT_EVERY === 0) await checkpoint();
+              continue;
+            }
+          }
+
+          const thread = await resolveThread({
             mailboxId: mb.id,
             subject: row.subject,
             customerAddr,
             referencedIds,
           });
+          const threadId = thread.id;
 
           const inserted = await db
             .insert(messages)
             .values({ ...row, threadId })
             .onConflictDoNothing()
             .returning({ id: messages.id });
+
+          // Perdeu uma corrida com outra execução: desfaz a thread recém-criada
+          // em vez de deixar um chamado vazio na fila.
+          if (inserted.length === 0 && thread.created) {
+            await db.delete(threads).where(eq(threads.id, threadId));
+          }
 
           if (inserted.length > 0) {
             fetched++;
