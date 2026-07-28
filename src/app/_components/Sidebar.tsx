@@ -83,8 +83,8 @@ export default function Sidebar({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/tihee-mark.svg" alt="Tihee" width={36} height={36} />
         <div className="brand-name">
-          <strong>Suporte Tihee</strong>
-          <span>Central interna</span>
+          <strong>Help Desk</strong>
+          <span>Central de Respostas</span>
         </div>
       </div>
 
