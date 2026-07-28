@@ -31,25 +31,9 @@ export default async function BasePage() {
         )}
 
         <div className="card pad">
-          <div style={{ marginBottom: 16 }}>
-            <div className="card-title">Prompt para Rascunhos</div>
-            <p className="page-sub" style={{ fontSize: 13 }}>
-              As instruções fixas enviadas à IA em toda análise.
-            </p>
-          </div>
-
           <form action={saveAiSettingsAction}>
-            <div className="field">
-              <label htmlFor="basePrompt">Instruções</label>
-              <textarea
-                id="basePrompt"
-                name="basePrompt"
-                style={{ minHeight: 220 }}
-                defaultValue={settings.basePrompt || DEFAULT_BASE_PROMPT}
-                disabled={!isAdmin}
-              />
-            </div>
-
+            {/* Fica no topo, fora das duas seções: o modelo é o mesmo para
+                rascunho e para envio automático. */}
             <div className="field">
               <label htmlFor="model">Modelo</label>
               <select
@@ -61,6 +45,29 @@ export default async function BasePage() {
                 <option value="deepseek-v4-flash">deepseek-v4-flash</option>
                 <option value="deepseek-v4-pro">deepseek-v4-pro</option>
               </select>
+              <span className="hint">
+                Vale para tudo: rascunhos e envio automático usam este modelo.
+              </span>
+            </div>
+
+            <div className="hr" style={{ margin: "20px 0" }} />
+
+            <div style={{ marginBottom: 12 }}>
+              <div className="card-title">Prompt para Rascunhos</div>
+              <p className="page-sub" style={{ fontSize: 13 }}>
+                As instruções fixas enviadas à IA em toda análise.
+              </p>
+            </div>
+
+            <div className="field">
+              <label htmlFor="basePrompt">Instruções</label>
+              <textarea
+                id="basePrompt"
+                name="basePrompt"
+                style={{ minHeight: 220 }}
+                defaultValue={settings.basePrompt || DEFAULT_BASE_PROMPT}
+                disabled={!isAdmin}
+              />
             </div>
 
             <label className="check">
