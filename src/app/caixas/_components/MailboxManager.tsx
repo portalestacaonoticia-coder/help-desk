@@ -19,6 +19,7 @@ export type MailboxLite = {
   fromAddress: string | null;
   signature: string | null;
   siteUrl: string | null;
+  everinboxProjectId: string | null;
   active: boolean;
   lastUid: number;
   lastIngestAt: Date | string | null;
@@ -345,6 +346,22 @@ export default function MailboxManager({
               />
               <span className="hint">
                 A IA lê o sitemap deste site para responder com base nos posts.
+              </span>
+            </div>
+
+            <div className="field">
+              <label htmlFor="everinboxProjectId">Projeto na Everinbox</label>
+              <input
+                id="everinboxProjectId"
+                name="everinboxProjectId"
+                className="mono"
+                placeholder="572c7b20-0a50-43cc-8566-fda73dfe9a81"
+                defaultValue={editing?.everinboxProjectId ?? ""}
+              />
+              <span className="hint">
+                ID do projeto ao qual esta operação está ligada. É dele que o
+                contato sai ao cancelar a inscrição. Em branco, o botão não
+                aparece no chamado.
               </span>
             </div>
 

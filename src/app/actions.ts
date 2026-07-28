@@ -20,6 +20,7 @@ import { encryptSecret } from "@/lib/crypto";
 import { suggestReplyForMessage, getAiSettings } from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
 import { verifyImap } from "@/lib/imap";
+import { deleteLead, EverinboxError } from "@/lib/everinbox";
 
 const VALID_STATUS = ["aberto", "fechado"] as const;
 
@@ -179,6 +180,54 @@ export async function deleteThreadsAction(formData: FormData) {
   await db.delete(threads).where(inArray(threads.id, ids));
 
   revalidatePath("/tickets");
+}
+
+/**
+ * Remove o contato da thread do projeto da operação na Everinbox.
+ *
+ * Ação externa e irreversível pelo Help Desk: o lead sai da base de e-mail
+ * marketing. Por isso devolve mensagem em vez de lançar — o agente precisa
+ * ver o que aconteceu.
+ */
+export async function unsubscribeContactAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  await requireUser();
+  const threadId = Number(formData.get("threadId"));
+
+  const [thread] = await db
+    .select({ customerAddr: threads.customerAddr, mailboxId: threads.mailboxId })
+    .from(threads)
+    .where(eq(threads.id, threadId))
+    .limit(1);
+  if (!thread) return "Chamado não encontrado.";
+  if (!thread.customerAddr) return "Este chamado não tem e-mail de contato.";
+
+  const [mb] = await db
+    .select({ everinboxProjectId: mailboxes.everinboxProjectId })
+    .from(mailboxes)
+    .where(eq(mailboxes.id, thread.mailboxId))
+    .limit(1);
+
+  if (!mb?.everinboxProjectId) {
+    return "A operação desta caixa não está ligada a um projeto na Everinbox.";
+  }
+
+  try {
+    await deleteLead({
+      idOrEmail: thread.customerAddr,
+      projectId: mb.everinboxProjectId,
+    });
+  } catch (err) {
+    if (err instanceof EverinboxError && err.status === 404) {
+      return `${thread.customerAddr} já não está nesse projeto.`;
+    }
+    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
+
+  revalidatePath(`/tickets/${threadId}`);
+  return `${thread.customerAddr} removido do projeto na Everinbox.`;
 }
 
 /** Cria uma nova macro. */
@@ -362,6 +411,8 @@ export async function saveMailboxAction(formData: FormData) {
   const fromAddress = String(formData.get("fromAddress") ?? "").trim() || imapUser;
   const signature = String(formData.get("signature") ?? "").trim() || null;
   const siteUrl = String(formData.get("siteUrl") ?? "").trim() || null;
+  const everinboxProjectId =
+    String(formData.get("everinboxProjectId") ?? "").trim() || null;
 
   const imapPort = Number(formData.get("imapPort")) || 993;
   const smtpPort = Number(formData.get("smtpPort")) || 465;
@@ -387,6 +438,7 @@ export async function saveMailboxAction(formData: FormData) {
     fromAddress,
     signature,
     siteUrl,
+    everinboxProjectId,
     active,
   };
 

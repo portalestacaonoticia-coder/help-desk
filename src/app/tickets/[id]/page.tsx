@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { threads, mailboxes, messages, macros, categories } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
 import ReplyArea from "./_components/ReplyArea";
+import UnsubscribeButton from "./_components/UnsubscribeButton";
 import { setStatusAction, setCategoryAction } from "@/app/actions";
 import {
   getAiSettingsSafe,
@@ -234,6 +235,12 @@ export default async function TicketPage({
                   <strong>{thread.customerAddr ?? "—"}</strong>
                 </div>
               </div>
+
+              <UnsubscribeButton
+                threadId={threadId}
+                contact={thread.customerAddr}
+                projectLinked={Boolean(mailbox?.everinboxProjectId)}
+              />
             </div>
           </div>
         </div>

@@ -32,6 +32,7 @@ export default async function MailboxesPage() {
       fromAddress: mailboxes.fromAddress,
       signature: mailboxes.signature,
       siteUrl: mailboxes.siteUrl,
+      everinboxProjectId: mailboxes.everinboxProjectId,
       active: mailboxes.active,
       lastUid: mailboxes.lastUid,
     })
