@@ -32,7 +32,7 @@ export default async function BasePage() {
 
         <div className="card pad">
           <div style={{ marginBottom: 16 }}>
-            <div className="card-title">Prompt base</div>
+            <div className="card-title">Prompt para Rascunhos</div>
             <p className="page-sub" style={{ fontSize: 13 }}>
               As instruções fixas enviadas à IA em toda análise.
             </p>
@@ -76,7 +76,7 @@ export default async function BasePage() {
             <div className="hr" style={{ margin: "20px 0" }} />
 
             <div style={{ marginBottom: 12 }}>
-              <div className="card-title">Envio automático</div>
+              <div className="card-title">Prompt para Envio automático</div>
               <p className="page-sub" style={{ fontSize: 13 }}>
                 Instruções que a IA segue quando responde sozinha, somadas ao
                 prompt base. Só valem quando o envio automático está ligado.
