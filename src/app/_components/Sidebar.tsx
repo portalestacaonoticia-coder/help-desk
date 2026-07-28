@@ -81,7 +81,7 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="brand">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/tihee-mark.svg" alt="Tihee" width={36} height={36} />
+        <img src="/tihee-logo.png" alt="Tihee" width={36} height={36} />
         <div className="brand-name">
           <strong>Help Desk</strong>
           <span>Central de Respostas</span>

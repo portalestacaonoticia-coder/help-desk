@@ -594,7 +594,8 @@ label {
 .trow {
   display: grid;
   /* ID · Assunto · Caixa · Categoria · Status */
-  grid-template-columns: 76px minmax(0, 1fr) 110px 120px 150px;
+  /* ID · Assunto · Operação · Categoria · Status */
+  grid-template-columns: 76px minmax(0, 1fr) 170px 120px 150px;
   gap: 12px;
   padding: 16px 24px;
   border-bottom: 1px solid hsl(var(--border));
@@ -605,7 +606,19 @@ label {
 }
 /* Coluna extra do checkbox quando a remoção em lote está disponível. */
 .trow.selectable {
-  grid-template-columns: 34px 76px minmax(0, 1fr) 110px 120px 150px;
+  grid-template-columns: 34px 76px minmax(0, 1fr) 170px 120px 150px;
+}
+/* Sem isto o item de grid usa min-width:auto e a tag vaza para a coluna
+   seguinte em vez de cortar. Nome de operação longo ganha reticências. */
+.trow > div {
+  min-width: 0;
+}
+.trow .tag {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 .trow.selected {
   background: hsl(var(--accent) / 0.6);

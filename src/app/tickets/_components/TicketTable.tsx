@@ -137,7 +137,10 @@ export default function TicketTable({
                 </div>
               </Link>
               <div>
-                <span className={`tag ${colorClass(t.mailboxId)}`}>
+                <span
+                  className={`tag ${colorClass(t.mailboxId)}`}
+                  title={t.mailboxLabel}
+                >
                   {t.mailboxLabel}
                 </span>
               </div>
