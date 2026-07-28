@@ -29,6 +29,13 @@
       "when": 1785700000000,
       "tag": "0003_categorias_padrao",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785800000000,
+      "tag": "0004_assinatura_por_caixa",
+      "breakpoints": true
     }
   ]
 }

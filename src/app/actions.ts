@@ -276,26 +276,14 @@ export async function saveAiSettingsAction(formData: FormData) {
 
   const basePrompt = String(formData.get("basePrompt") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim() || "deepseek-v4-flash";
-  const signature = String(formData.get("signature") ?? "").trim() || null;
   const enabled = formData.get("enabled") === "on";
-
-  const temperature = clamp(Number(formData.get("temperature")), 0, 2, 0.3);
-  const confidenceThreshold = clamp(
-    Number(formData.get("confidenceThreshold")),
-    0,
-    1,
-    0.75,
-  );
 
   await db
     .update(aiSettings)
     .set({
       basePrompt,
       model,
-      signature,
       enabled,
-      temperature,
-      confidenceThreshold,
       updatedAt: new Date(),
     })
     .where(eq(aiSettings.id, 1));
@@ -382,6 +370,8 @@ export async function saveMailboxAction(formData: FormData) {
   const smtpUser = String(formData.get("smtpUser") ?? "").trim() || imapUser;
   const smtpPass = String(formData.get("smtpPass") ?? "");
   const fromAddress = String(formData.get("fromAddress") ?? "").trim() || imapUser;
+  const signature = String(formData.get("signature") ?? "").trim() || null;
+  const siteUrl = String(formData.get("siteUrl") ?? "").trim() || null;
 
   const imapPort = Number(formData.get("imapPort")) || 993;
   const smtpPort = Number(formData.get("smtpPort")) || 465;
@@ -405,6 +395,8 @@ export async function saveMailboxAction(formData: FormData) {
     smtpUser,
     smtpTls,
     fromAddress,
+    signature,
+    siteUrl,
     active,
   };
 

@@ -37,6 +37,13 @@ export const mailboxes = pgTable("mailboxes", {
   // Endereço "From" usado ao responder (default: imapUser).
   fromAddress: text("from_address"),
 
+  // Assinatura anexada às respostas desta caixa. É por caixa, não global:
+  // cada operação assina com o nome dela.
+  signature: text("signature"),
+
+  // Site da operação. A IA lê o sitemap dele para responder com base nos posts.
+  siteUrl: text("site_url"),
+
   // Último UID processado na pasta INBOX (idempotência da ingestão).
   lastUid: integer("last_uid").notNull().default(0),
   // UIDVALIDITY do IMAP: se mudar, os UIDs foram reciclados e last_uid deve resetar.
@@ -202,11 +209,6 @@ export const aiSettings = pgTable("ai_settings", {
   enabled: boolean("enabled").notNull().default(true),
   model: text("model").notNull().default("deepseek-v4-flash"),
   basePrompt: text("base_prompt").notNull().default(""),
-  // Assinatura anexada ao final de toda resposta gerada.
-  signature: text("signature"),
-  temperature: real("temperature").notNull().default(0.3),
-  // Abaixo deste limiar a IA não propõe categoria nem auto-envio (0 a 1).
-  confidenceThreshold: real("confidence_threshold").notNull().default(0.75),
   // Trava mestra do envio automático. Off = tudo vira rascunho para revisão.
   autoSendEnabled: boolean("auto_send_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

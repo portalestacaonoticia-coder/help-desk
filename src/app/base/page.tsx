@@ -1,6 +1,6 @@
-import { eq, asc, desc, sql } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, knowledgeBase } from "@/db/schema";
+import { categories } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import AppShell from "@/app/_components/AppShell";
 import { getAiSettings, DEFAULT_BASE_PROMPT } from "@/lib/ai";
@@ -10,7 +10,6 @@ import {
   toggleCategoryAction,
   saveAiSettingsAction,
 } from "@/app/actions";
-import ArticleEditor from "./_components/ArticleEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -28,29 +27,9 @@ export default async function BasePage() {
       description: categories.description,
       autoRespondivel: categories.autoRespondivel,
       active: categories.active,
-      articleCount: sql<number>`(
-        select count(*)::int from ${knowledgeBase}
-        where ${knowledgeBase.categoryId} = ${categories.id}
-          and ${knowledgeBase.active}
-      )`,
     })
     .from(categories)
     .orderBy(asc(categories.name));
-
-  const articles = await db
-    .select({
-      id: knowledgeBase.id,
-      title: knowledgeBase.title,
-      content: knowledgeBase.content,
-      keywords: knowledgeBase.keywords,
-      categoryId: knowledgeBase.categoryId,
-      categoryName: categories.name,
-      updatedAt: knowledgeBase.updatedAt,
-    })
-    .from(knowledgeBase)
-    .leftJoin(categories, eq(categories.id, knowledgeBase.categoryId))
-    .where(eq(knowledgeBase.active, true))
-    .orderBy(desc(knowledgeBase.updatedAt));
 
   return (
     <AppShell>
@@ -59,9 +38,9 @@ export default async function BasePage() {
           <div>
             <h1>Base de conhecimento</h1>
             <p className="page-sub">
-              {articles.length} artigo{articles.length === 1 ? "" : "s"} e{" "}
-              {catList.length} categoria{catList.length === 1 ? "" : "s"}. É esse
-              material que orienta a IA ao redigir as respostas.
+              {catList.length} categoria{catList.length === 1 ? "" : "s"}. O
+              prompt base e as categorias orientam a IA ao classificar e redigir
+              as respostas.
             </p>
           </div>
         </div>
@@ -70,8 +49,7 @@ export default async function BasePage() {
           <div className="callout warn">
             <strong>DeepSeek não configurado.</strong> Defina{" "}
             <span className="mono">DEEPSEEK_API_KEY</span> no ambiente para a IA
-            começar a gerar rascunhos. A base de conhecimento pode ser escrita
-            normalmente antes disso.
+            começar a gerar rascunhos.
           </div>
         )}
 
@@ -81,7 +59,7 @@ export default async function BasePage() {
             <div className="card-title">Prompt base</div>
             <p className="page-sub" style={{ fontSize: 13 }}>
               As instruções fixas enviadas à IA em toda análise, antes das
-              categorias e dos artigos.
+              categorias.
             </p>
           </div>
 
@@ -97,58 +75,17 @@ export default async function BasePage() {
               />
             </div>
 
-            <div className="grid-3">
-              <div className="field">
-                <label htmlFor="model">Modelo</label>
-                <select
-                  id="model"
-                  name="model"
-                  defaultValue={settings.model}
-                  disabled={!isAdmin}
-                >
-                  <option value="deepseek-v4-flash">deepseek-v4-flash</option>
-                  <option value="deepseek-v4-pro">deepseek-v4-pro</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="temperature">Temperatura</label>
-                <input
-                  id="temperature"
-                  name="temperature"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  defaultValue={settings.temperature}
-                  disabled={!isAdmin}
-                />
-                <span className="hint">Menor = mais previsível.</span>
-              </div>
-              <div className="field">
-                <label htmlFor="confidenceThreshold">Limiar de confiança</label>
-                <input
-                  id="confidenceThreshold"
-                  name="confidenceThreshold"
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  max="1"
-                  defaultValue={settings.confidenceThreshold}
-                  disabled={!isAdmin}
-                />
-                <span className="hint">Abaixo disso não sugere categoria.</span>
-              </div>
-            </div>
-
             <div className="field">
-              <label htmlFor="signature">Assinatura</label>
-              <input
-                id="signature"
-                name="signature"
-                placeholder="Equipe de Suporte Tihee"
-                defaultValue={settings.signature ?? ""}
+              <label htmlFor="model">Modelo</label>
+              <select
+                id="model"
+                name="model"
+                defaultValue={settings.model}
                 disabled={!isAdmin}
-              />
+              >
+                <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+                <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+              </select>
             </div>
 
             <label className="check">
@@ -163,7 +100,8 @@ export default async function BasePage() {
 
             <div className="callout" style={{ marginTop: 14 }}>
               A IA nunca envia e-mail sozinha: ela só prepara o rascunho, e o
-              envio continua sendo um clique do agente no chamado.
+              envio continua sendo um clique do agente no chamado. A assinatura
+              é definida por caixa, em Caixas de e-mail.
             </div>
 
             {isAdmin ? (
@@ -184,8 +122,8 @@ export default async function BasePage() {
             <div className="card-head">Categorias</div>
             {catList.length === 0 ? (
               <div className="empty">
-                Nenhuma categoria. A IA precisa delas para classificar os
-                chamados.
+                Nenhuma categoria. A IA precisa delas para classificar as
+                respostas.
               </div>
             ) : (
               catList.map((c) => (
@@ -193,7 +131,6 @@ export default async function BasePage() {
                   <div className="head">
                     <strong>{c.name}</strong>
                     <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span className="pill">{c.articleCount} artigos</span>
                       {c.autoRespondivel && (
                         <span className="badge ok">Auto-respondível</span>
                       )}
@@ -249,7 +186,7 @@ export default async function BasePage() {
               </div>
               <label className="check">
                 <input type="checkbox" name="autoRespondivel" />
-                <span>Auto-respondível no futuro</span>
+                <span>Liberar para envio automático</span>
               </label>
               <button type="submit" className="primary" style={{ width: "100%", marginTop: 12 }}>
                 Criar categoria
@@ -257,9 +194,6 @@ export default async function BasePage() {
             </form>
           </div>
         </div>
-
-        {/* ---- Artigos ---- */}
-        <ArticleEditor articles={articles} categories={catList} />
       </section>
     </AppShell>
   );

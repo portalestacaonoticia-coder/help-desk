@@ -17,6 +17,8 @@ export type MailboxLite = {
   smtpUser: string;
   smtpTls: boolean;
   fromAddress: string | null;
+  signature: string | null;
+  siteUrl: string | null;
   active: boolean;
   lastUid: number;
   lastIngestAt: Date | string | null;
@@ -317,6 +319,35 @@ export default function MailboxManager({
                 defaultValue={editing?.fromAddress ?? ""}
               />
             </div>
+            <div className="field">
+              <label htmlFor="signature">Assinatura</label>
+              <textarea
+                id="signature"
+                name="signature"
+                style={{ minHeight: 70 }}
+                placeholder="Equipe Estação Finanças"
+                defaultValue={editing?.signature ?? ""}
+              />
+              <span className="hint">
+                Anexada às respostas desta caixa. Cada operação assina com o
+                nome dela.
+              </span>
+            </div>
+
+            <div className="field">
+              <label htmlFor="siteUrl">Site da operação</label>
+              <input
+                id="siteUrl"
+                name="siteUrl"
+                type="url"
+                placeholder="https://br.estacaofinancas.com"
+                defaultValue={editing?.siteUrl ?? ""}
+              />
+              <span className="hint">
+                A IA lê o sitemap deste site para responder com base nos posts.
+              </span>
+            </div>
+
             <label className="check" style={{ marginBottom: 14 }}>
               <input
                 type="checkbox"

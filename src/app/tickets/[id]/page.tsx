@@ -157,7 +157,7 @@ export default async function TicketPage({
               macros={macroList}
               suggestion={suggestion}
               lastInboundId={lastInbound?.id ?? null}
-              signature={settings.signature}
+              signature={mailbox?.signature ?? null}
               aiUnavailableReason={aiUnavailableReason}
             />
           </div>

@@ -52,9 +52,6 @@ const FALLBACK_SETTINGS: AiSettings = {
   enabled: false,
   model: DEFAULT_MODEL,
   basePrompt: DEFAULT_BASE_PROMPT,
-  signature: null,
-  temperature: 0.3,
-  confidenceThreshold: 0.75,
   autoSendEnabled: false,
   updatedAt: new Date(0),
 };
@@ -333,23 +330,17 @@ export async function suggestReplyForMessage(messageId: number): Promise<{
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      {
-        model: settings.model || DEFAULT_MODEL,
-        temperature: settings.temperature,
-      },
+      { model: settings.model || DEFAULT_MODEL },
     );
 
     const s = normalizeSuggestion(result.data);
 
-    // Categoria só é aceita se existir de fato, passar do limiar e o modelo não
-    // ter sinalizado que o caso precisa de um humano.
+    // Categoria só é aceita se existir de fato e o modelo não tiver sinalizado
+    // que o caso precisa de um humano.
     const known = cats.find(
       (c) => c.name.toLowerCase() === (s.categoria ?? "").toLowerCase(),
     );
-    const categoria =
-      known && !s.precisa_humano && s.confianca >= settings.confidenceThreshold
-        ? known.name
-        : null;
+    const categoria = known && !s.precisa_humano ? known.name : null;
 
     // Sinalizar "precisa humano" derruba a confiança exibida ao agente, para o
     // card não passar segurança que o próprio modelo disse não ter.

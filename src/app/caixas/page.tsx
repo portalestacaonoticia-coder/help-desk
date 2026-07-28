@@ -30,6 +30,8 @@ export default async function MailboxesPage() {
       smtpUser: mailboxes.smtpUser,
       smtpTls: mailboxes.smtpTls,
       fromAddress: mailboxes.fromAddress,
+      signature: mailboxes.signature,
+      siteUrl: mailboxes.siteUrl,
       active: mailboxes.active,
       lastUid: mailboxes.lastUid,
     })
