@@ -1,12 +1,20 @@
 import { db } from "@/db";
 import { macros } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
-import { createMacroAction } from "@/app/actions";
+import MacroManager from "./_components/MacroManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function MacrosPage() {
-  const list = await db.select().from(macros).orderBy(macros.title);
+  const list = await db
+    .select({
+      id: macros.id,
+      title: macros.title,
+      body: macros.body,
+      shortcut: macros.shortcut,
+    })
+    .from(macros)
+    .orderBy(macros.title);
 
   return (
     <AppShell>
@@ -22,44 +30,7 @@ export default async function MacrosPage() {
           </div>
         </div>
 
-        <div className="macro-grid">
-          <div className="card">
-            {list.length === 0 ? (
-              <div className="empty">Nenhuma resposta pronta cadastrada.</div>
-            ) : (
-              list.map((m) => (
-                <div key={m.id} className="macro-item">
-                  <div className="head">
-                    <strong>{m.title}</strong>
-                    {m.shortcut && <span className="pill mono">{m.shortcut}</span>}
-                  </div>
-                  <div className="body">{m.body}</div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="card props">
-            <span className="card-title">Nova resposta pronta</span>
-            <form action={createMacroAction}>
-              <div className="field">
-                <label htmlFor="title">Título</label>
-                <input id="title" name="title" required />
-              </div>
-              <div className="field">
-                <label htmlFor="shortcut">Atalho (opcional)</label>
-                <input id="shortcut" name="shortcut" placeholder="/ola" />
-              </div>
-              <div className="field">
-                <label htmlFor="body">Corpo</label>
-                <textarea id="body" name="body" required style={{ minHeight: 140 }} />
-              </div>
-              <button type="submit" className="primary" style={{ width: "100%" }}>
-                Criar
-              </button>
-            </form>
-          </div>
-        </div>
+        <MacroManager macros={list} />
       </section>
     </AppShell>
   );

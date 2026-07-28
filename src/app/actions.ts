@@ -226,15 +226,24 @@ export async function unsubscribeContactAction(
 }
 
 /** Cria uma nova macro. */
-export async function createMacroAction(formData: FormData) {
+/** Cria ou edita uma resposta pronta. Com `id` no form, edita. */
+export async function saveMacroAction(formData: FormData) {
   await requireUser();
+  const rawId = String(formData.get("id") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const shortcut = String(formData.get("shortcut") ?? "").trim() || null;
 
   if (!title || !body) throw new Error("Título e corpo são obrigatórios");
 
-  await db.insert(macros).values({ title, body, shortcut });
+  if (rawId) {
+    await db
+      .update(macros)
+      .set({ title, body, shortcut })
+      .where(eq(macros.id, Number(rawId)));
+  } else {
+    await db.insert(macros).values({ title, body, shortcut });
+  }
   revalidatePath("/macros");
 }
 
