@@ -27,7 +27,11 @@ const MAX_MESSAGES_PER_RUN = 200;
 
 // Orçamento de tempo por caixa, abaixo do maxDuration=60s da rota de cron.
 // Ao estourar, o loop para e o progresso já está salvo (ver checkpoint abaixo).
-const TIME_BUDGET_MS = 35_000;
+// Folga para o encerramento da conexão e a gravação do log depois do loop.
+const TIME_BUDGET_MS = 30_000;
+
+// Teto de espera pelo logout educado antes de derrubar o socket.
+const LOGOUT_TIMEOUT_MS = 3_000;
 
 // A cada N mensagens grava o ponteiro. Sem isso, uma execução interrompida
 // perde todo o trabalho e a próxima recomeça do mesmo UID, para sempre.
@@ -120,6 +124,32 @@ function toMessageRow(parsed: ParsedMail, uid: number, mailboxId: number) {
     imapUid: uid,
     sentAt: parsed.date ?? null,
   };
+}
+
+/**
+ * Encerra a conexão sem risco de pendurar a função.
+ *
+ * `logout()` é um comando IMAP: ele espera a resposta do servidor. Quando o
+ * socket já morreu — o caso da HostGator derrubando a conexão no meio — essa
+ * espera nunca termina, a função estoura o maxDuration e é morta ANTES de
+ * gravar o ingest_log. Foi o que produziu o buraco entre "último e-mail
+ * entrou" e "última ingestão": o trabalho acontecia, o registro não.
+ */
+async function disconnect(client: ImapFlow): Promise<void> {
+  try {
+    await Promise.race([
+      client.logout(),
+      new Promise<void>((resolve) => setTimeout(resolve, LOGOUT_TIMEOUT_MS)),
+    ]);
+  } catch {
+    /* servidor sumiu; close() abaixo resolve */
+  }
+  try {
+    // Derruba o socket na marra — não espera resposta de ninguém.
+    client.close();
+  } catch {
+    /* já estava fechado */
+  }
 }
 
 /**
@@ -287,14 +317,10 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
     } finally {
       lock.release();
     }
-    await client.logout();
+    await disconnect(client);
     return { ...base, fetched, status: "ok" };
   } catch (err) {
-    try {
-      await client.logout();
-    } catch {
-      /* ignora erro de logout após falha */
-    }
+    await disconnect(client);
     return {
       ...base,
       fetched,
@@ -322,9 +348,7 @@ export async function verifyImap(mb: Mailbox): Promise<void> {
     const lock = await client.getMailboxLock("INBOX");
     lock.release();
   } finally {
-    await client.logout().catch(() => {
-      /* ignora erro de logout */
-    });
+    await disconnect(client);
   }
 }
 
