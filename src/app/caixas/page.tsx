@@ -12,8 +12,11 @@ export default async function MailboxesPage() {
   const session = await auth();
   const canEdit = session?.user?.role === "admin";
 
-  // Último log de ingestão por caixa, via subquery correlacionada.
-  const rows = await db
+  // Correlação NÃO pode sair de subquery em template `sql`: ali o drizzle
+  // renderiza a coluna sem o prefixo da tabela, então `${x.mailboxId} =
+  // ${mailboxes.id}` vira `"mailbox_id" = "id"` e os dois resolvem contra a
+  // tabela de dentro. Por isso cada agregação vem na sua própria query.
+  const boxes = await db
     .select({
       id: mailboxes.id,
       label: mailboxes.label,
@@ -29,28 +32,42 @@ export default async function MailboxesPage() {
       fromAddress: mailboxes.fromAddress,
       active: mailboxes.active,
       lastUid: mailboxes.lastUid,
-      threadCount: sql<number>`(
-        select count(*)::int from ${threads}
-        where ${threads.mailboxId} = ${mailboxes.id}
-      )`,
-      lastIngestAt: sql<Date | null>`(
-        select ${ingestLogs.createdAt} from ${ingestLogs}
-        where ${ingestLogs.mailboxId} = ${mailboxes.id}
-        order by ${ingestLogs.createdAt} desc limit 1
-      )`,
-      lastIngestStatus: sql<string | null>`(
-        select ${ingestLogs.status} from ${ingestLogs}
-        where ${ingestLogs.mailboxId} = ${mailboxes.id}
-        order by ${ingestLogs.createdAt} desc limit 1
-      )`,
-      lastIngestMessage: sql<string | null>`(
-        select ${ingestLogs.message} from ${ingestLogs}
-        where ${ingestLogs.mailboxId} = ${mailboxes.id}
-        order by ${ingestLogs.createdAt} desc limit 1
-      )`,
     })
     .from(mailboxes)
     .orderBy(asc(mailboxes.label));
+
+  const counts = await db
+    .select({ mailboxId: threads.mailboxId, n: sql<number>`count(*)::int` })
+    .from(threads)
+    .groupBy(threads.mailboxId);
+  const countByMailbox = new Map(counts.map((c) => [c.mailboxId, c.n]));
+
+  // Último log por caixa (DISTINCT ON é eficiente no Postgres).
+  const logRows = await db.execute<{
+    mailbox_id: number;
+    status: string;
+    message: string | null;
+    created_at: string;
+  }>(
+    sql`select distinct on (mailbox_id) mailbox_id, status, message, created_at
+        from ${ingestLogs}
+        where mailbox_id is not null
+        order by mailbox_id, created_at desc`,
+  );
+  const logByMailbox = new Map(
+    [...logRows].map((r) => [Number(r.mailbox_id), r]),
+  );
+
+  const rows = boxes.map((b) => {
+    const log = logByMailbox.get(b.id);
+    return {
+      ...b,
+      threadCount: countByMailbox.get(b.id) ?? 0,
+      lastIngestAt: log ? new Date(log.created_at) : null,
+      lastIngestStatus: log?.status ?? null,
+      lastIngestMessage: log?.message ?? null,
+    };
+  });
 
   const failing = rows.filter((r) => r.lastIngestStatus === "error");
   // Ordena por tempo de verdade: o sort padrão compara datas como string.

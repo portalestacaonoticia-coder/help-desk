@@ -21,6 +21,18 @@ export type IngestResult = {
 // Janela para agrupar por assunto quando não há In-Reply-To/References.
 const SUBJECT_MATCH_WINDOW_DAYS = 30;
 
+// Teto de mensagens por execução. Caixa nova tem milhares de e-mails e baixar
+// tudo de uma vez estoura o maxDuration da função — o cron drena aos poucos.
+const MAX_MESSAGES_PER_RUN = 200;
+
+// Orçamento de tempo por caixa, abaixo do maxDuration=60s da rota de cron.
+// Ao estourar, o loop para e o progresso já está salvo (ver checkpoint abaixo).
+const TIME_BUDGET_MS = 35_000;
+
+// A cada N mensagens grava o ponteiro. Sem isso, uma execução interrompida
+// perde todo o trabalho e a próxima recomeça do mesmo UID, para sempre.
+const CHECKPOINT_EVERY = 20;
+
 /**
  * Encontra (ou cria) a thread à qual uma mensagem recebida pertence.
  * Retorna o id da thread.
@@ -125,6 +137,7 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
   });
 
   let fetched = 0;
+  const startedAt = Date.now();
   try {
     await client.connect();
     const lock = await client.getMailboxLock("INBOX");
@@ -146,75 +159,101 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
       }
 
       let maxUid = lastUid;
+      let persistedUid = mb.lastUid;
       const range = `${lastUid + 1}:*`;
 
-      for await (const msg of client.fetch(
-        range,
-        { uid: true, source: true, envelope: true, internalDate: true },
-        { uid: true },
-      )) {
-        const uid = msg.uid;
-        // O range "N:*" pode retornar a última mensagem mesmo quando N > maxUid.
-        if (uid <= lastUid) continue;
-        if (!msg.source) continue;
-
-        // Idempotência: já existe essa mensagem (por UID) nesta caixa?
-        const already = await db
-          .select({ id: messages.id })
-          .from(messages)
-          .where(
-            and(eq(messages.mailboxId, mb.id), eq(messages.imapUid, uid)),
-          )
-          .limit(1);
-        if (already.length > 0) {
-          if (uid > maxUid) maxUid = uid;
-          continue;
+      // Grava o ponteiro no meio do caminho para que uma execução interrompida
+      // (timeout, queda do socket) não perca o que já foi processado.
+      const checkpoint = async () => {
+        if (maxUid === persistedUid && currentUidValidity === mb.uidValidity) {
+          return;
         }
-
-        const parsed = await simpleParser(msg.source);
-        const row = toMessageRow(parsed, uid, mb.id);
-        const customerAddr = extractEmail(row.fromAddr);
-        const referencedIds = parseReferencedIds(
-          row.inReplyTo,
-          row.referencesHeader,
-        );
-
-        const threadId = await resolveThread({
-          mailboxId: mb.id,
-          subject: row.subject,
-          customerAddr,
-          referencedIds,
-        });
-
-        const inserted = await db
-          .insert(messages)
-          .values({ ...row, threadId })
-          .onConflictDoNothing()
-          .returning({ id: messages.id });
-
-        if (inserted.length > 0) {
-          fetched++;
-          // Mensagem nova do cliente reabre o chamado: se já estava fechado,
-          // volta para a fila em vez de ficar invisível para a equipe.
-          await db
-            .update(threads)
-            .set({
-              lastMessageAt: row.sentAt ?? new Date(),
-              customerAddr: customerAddr ?? undefined,
-              status: sql`'aberto'`,
-            })
-            .where(eq(threads.id, threadId));
-        }
-
-        if (uid > maxUid) maxUid = uid;
-      }
-
-      // Persiste o novo ponteiro e o UIDVALIDITY atual.
-      if (maxUid !== mb.lastUid || currentUidValidity !== mb.uidValidity) {
         await db
           .update(mailboxes)
           .set({ lastUid: maxUid, uidValidity: currentUidValidity })
           .where(eq(mailboxes.id, mb.id));
+        persistedUid = maxUid;
+      };
+
+      let processed = 0;
+      try {
+        for await (const msg of client.fetch(
+          range,
+          { uid: true, source: true, envelope: true, internalDate: true },
+          { uid: true },
+        )) {
+          // Para antes de estourar o tempo da função. O `break` fecha o fetch
+          // e o que já foi lido fica salvo pelo checkpoint do finally.
+          if (
+            processed >= MAX_MESSAGES_PER_RUN ||
+            Date.now() - startedAt > TIME_BUDGET_MS
+          ) {
+            break;
+          }
+
+          const uid = msg.uid;
+          // O range "N:*" pode retornar a última mensagem mesmo quando N > maxUid.
+          if (uid <= lastUid) continue;
+          if (!msg.source) continue;
+
+          processed++;
+
+          // Idempotência: já existe essa mensagem (por UID) nesta caixa?
+          const already = await db
+            .select({ id: messages.id })
+            .from(messages)
+            .where(and(eq(messages.mailboxId, mb.id), eq(messages.imapUid, uid)))
+            .limit(1);
+          if (already.length > 0) {
+            if (uid > maxUid) maxUid = uid;
+            if (processed % CHECKPOINT_EVERY === 0) await checkpoint();
+            continue;
+          }
+
+          const parsed = await simpleParser(msg.source);
+          const row = toMessageRow(parsed, uid, mb.id);
+          const customerAddr = extractEmail(row.fromAddr);
+          const referencedIds = parseReferencedIds(
+            row.inReplyTo,
+            row.referencesHeader,
+          );
+
+          const threadId = await resolveThread({
+            mailboxId: mb.id,
+            subject: row.subject,
+            customerAddr,
+            referencedIds,
+          });
+
+          const inserted = await db
+            .insert(messages)
+            .values({ ...row, threadId })
+            .onConflictDoNothing()
+            .returning({ id: messages.id });
+
+          if (inserted.length > 0) {
+            fetched++;
+            // Mensagem nova do cliente reabre o chamado: se já estava fechado,
+            // volta para a fila em vez de ficar invisível para a equipe.
+            await db
+              .update(threads)
+              .set({
+                lastMessageAt: row.sentAt ?? new Date(),
+                customerAddr: customerAddr ?? undefined,
+                status: sql`'aberto'`,
+              })
+              .where(eq(threads.id, threadId));
+          }
+
+          if (uid > maxUid) maxUid = uid;
+          if (processed % CHECKPOINT_EVERY === 0) await checkpoint();
+        }
+      } finally {
+        // Vale também para o caminho de erro: o socket pode cair no meio do
+        // loop, e o que já entrou no banco tem que ficar registrado.
+        await checkpoint().catch(() => {
+          /* não mascara o erro original */
+        });
       }
     } finally {
       lock.release();

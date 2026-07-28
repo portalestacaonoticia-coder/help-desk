@@ -1,4 +1,4 @@
-import { eq, asc, sql } from "drizzle-orm";
+import { and, eq, asc, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { threads, mailboxes } from "@/db/schema";
@@ -26,18 +26,24 @@ export default async function AppShell({
     .where(eq(threads.status, "aberto"));
 
   // Uma entrada de menu por operação (caixa ativa), com sua fila em aberto.
+  //
+  // Correlação por leftJoin, não por subquery em template `sql`: dentro do
+  // template o drizzle renderiza a coluna sem o prefixo da tabela, e
+  // `${threads.mailboxId} = ${mailboxes.id}` viraria `"mailbox_id" = "id"` —
+  // ambos resolvidos contra `threads`. Os helpers (eq/and) qualificam certo.
   const operations = await db
     .select({
       id: mailboxes.id,
       name: sql<string>`coalesce(nullif(${mailboxes.operation}, ''), ${mailboxes.label})`,
-      openCount: sql<number>`(
-        select count(*)::int from ${threads}
-        where ${threads.mailboxId} = ${mailboxes.id}
-          and ${threads.status} = 'aberto'
-      )`,
+      openCount: sql<number>`count(${threads.id})::int`,
     })
     .from(mailboxes)
+    .leftJoin(
+      threads,
+      and(eq(threads.mailboxId, mailboxes.id), eq(threads.status, "aberto")),
+    )
     .where(eq(mailboxes.active, true))
+    .groupBy(mailboxes.id, mailboxes.operation, mailboxes.label)
     .orderBy(asc(mailboxes.label));
 
   return (
