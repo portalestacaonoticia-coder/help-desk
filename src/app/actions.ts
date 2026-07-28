@@ -296,6 +296,8 @@ export async function saveAiSettingsAction(formData: FormData) {
   const basePrompt = String(formData.get("basePrompt") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim() || "deepseek-v4-flash";
   const enabled = formData.get("enabled") === "on";
+  const autoSendPrompt = String(formData.get("autoSendPrompt") ?? "").trim();
+  const autoSendEnabled = formData.get("autoSendEnabled") === "on";
 
   await db
     .update(aiSettings)
@@ -303,6 +305,8 @@ export async function saveAiSettingsAction(formData: FormData) {
       basePrompt,
       model,
       enabled,
+      autoSendPrompt,
+      autoSendEnabled,
       updatedAt: new Date(),
     })
     .where(eq(aiSettings.id, 1));
