@@ -32,6 +32,8 @@ export default function UnsubscribeButton({
     );
   }
 
+  // Só "Falhou" é erro. Timeout devolve texto de sucesso parcial, porque a
+  // remoção quase certamente aconteceu — pintar de vermelho enganaria.
   const failed = result?.startsWith("Falhou");
 
   return (

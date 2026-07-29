@@ -8,13 +8,18 @@
 
 const BASE_URL = "https://external.everinbox.com.br";
 
-// Timeout curto: o botão é síncrono para o agente, não pode pendurar a tela.
-const TIMEOUT_MS = 15_000;
+// A API às vezes leva mais de 15s para confirmar uma remoção que já executou.
+const TIMEOUT_MS = 25_000;
 
 export class EverinboxError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /**
+     * Timeout é INCONCLUSIVO, não negativo: a remoção pode ter acontecido do
+     * lado de lá sem a resposta chegar aqui. Quem chama precisa distinguir.
+     */
+    readonly timedOut = false,
   ) {
     super(message);
     this.name = "EverinboxError";
@@ -145,7 +150,11 @@ export async function deleteLead(params: {
     });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new EverinboxError("A Everinbox não respondeu a tempo");
+      throw new EverinboxError(
+        "A Everinbox não respondeu a tempo",
+        undefined,
+        true,
+      );
     }
     throw new EverinboxError(
       err instanceof Error ? err.message : "Falha de rede ao chamar a Everinbox",

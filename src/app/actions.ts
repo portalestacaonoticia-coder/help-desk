@@ -234,34 +234,63 @@ export async function unsubscribeContactAction(
     return "A operação desta caixa não está ligada a nenhum projeto na Everinbox.";
   }
 
-  // Um projeto que falha não impede os outros: o contato pediu para sair de
-  // todos, e sair de alguns é melhor que sair de nenhum.
-  let removidos = 0;
-  let ausentes = 0;
-  const falhas: string[] = [];
+  const email = thread.customerAddr;
 
-  for (const projectId of projetos) {
-    try {
-      await deleteLead({ idOrEmail: thread.customerAddr, projectId });
-      removidos++;
-    } catch (err) {
-      if (err instanceof EverinboxError && err.status === 404) {
-        ausentes++;
-      } else {
-        falhas.push(err instanceof Error ? err.message : String(err));
+  /**
+   * Um projeto. Em caso de timeout tenta de novo: o DELETE é idempotente, e
+   * se a primeira chamada tiver funcionado a segunda devolve 404 — que aqui
+   * significa "já saiu", ou seja, o resultado que queríamos.
+   */
+  async function removerDe(projectId: string) {
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        await deleteLead({ idOrEmail: email!, projectId });
+        return "removido" as const;
+      } catch (err) {
+        if (err instanceof EverinboxError && err.status === 404) {
+          return "ausente" as const;
+        }
+        if (err instanceof EverinboxError && err.timedOut && tentativa === 1) {
+          continue; // segunda e última tentativa
+        }
+        if (err instanceof EverinboxError && err.timedOut) {
+          return "incerto" as const;
+        }
+        throw err;
       }
     }
+    return "incerto" as const;
   }
+
+  // Em paralelo: sequencial, com 3 projetos e timeout de 25s, a action inteira
+  // poderia passar do limite de tempo da função.
+  const resultados = await Promise.allSettled(projetos.map(removerDe));
 
   revalidatePath(`/tickets/${threadId}`);
 
-  if (falhas.length > 0) {
-    return `Falhou em ${falhas.length} de ${projetos.length} projeto(s): ${falhas[0]}`;
+  const conta = (v: string) =>
+    resultados.filter((r) => r.status === "fulfilled" && r.value === v).length;
+
+  const removidos = conta("removido");
+  const ausentes = conta("ausente");
+  const incertos = conta("incerto");
+  const erros = resultados.filter((r) => r.status === "rejected");
+
+  if (erros.length > 0) {
+    const motivo = (erros[0] as PromiseRejectedResult).reason;
+    return `Falhou em ${erros.length} de ${projetos.length} projeto(s): ${
+      motivo instanceof Error ? motivo.message : String(motivo)
+    }`;
+  }
+
+  // Timeout não é falha: a remoção provavelmente aconteceu, só não confirmou.
+  if (incertos > 0) {
+    return `${email} removido de ${removidos + ausentes} projeto(s). Em ${incertos} a Everinbox não confirmou a tempo — provavelmente saiu também, confira no painel dela.`;
   }
   if (removidos === 0) {
-    return `${thread.customerAddr} já não estava em nenhum dos ${projetos.length} projeto(s).`;
+    return `${email} já não estava em nenhum dos ${projetos.length} projeto(s).`;
   }
-  return `${thread.customerAddr} removido de ${removidos} projeto(s)${ausentes > 0 ? ` (não estava em ${ausentes})` : ""}.`;
+  return `${email} removido de ${removidos} projeto(s)${ausentes > 0 ? ` (não estava em ${ausentes})` : ""}.`;
 }
 
 /** Cria uma nova macro. */
