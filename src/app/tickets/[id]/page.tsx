@@ -234,7 +234,7 @@ export default async function TicketPage({
               <UnsubscribeButton
                 threadId={threadId}
                 contact={thread.customerAddr}
-                projectLinked={Boolean(mailbox?.everinboxProjectId)}
+                projectLinked={Boolean(mailbox?.everinboxProjectIds?.trim())}
               />
             </div>
           </div>

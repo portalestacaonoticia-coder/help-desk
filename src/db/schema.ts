@@ -44,9 +44,10 @@ export const mailboxes = pgTable("mailboxes", {
   // Site da operação. A IA lê o sitemap dele para responder com base nos posts.
   siteUrl: text("site_url"),
 
-  // Projeto da operação na Everinbox (uuid). É dele que o contato é removido
-  // quando pede descadastramento. Vazio = botão de cancelar inscrição some.
-  everinboxProjectId: text("everinbox_project_id"),
+  // Projetos da operação na Everinbox, ids separados por vírgula. Uma caixa
+  // pode atender vários projetos, e o descadastramento remove o contato de
+  // todos. Vazio = botão de cancelar inscrição some do chamado.
+  everinboxProjectIds: text("everinbox_project_ids"),
 
   // Último UID processado na pasta INBOX (idempotência da ingestão).
   lastUid: integer("last_uid").notNull().default(0),

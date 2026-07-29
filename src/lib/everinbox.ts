@@ -25,6 +25,53 @@ export function isEverinboxConfigured(): boolean {
   return Boolean(process.env.EVERINBOX_API_KEY);
 }
 
+export type EverinboxProject = { id: string; name: string };
+
+/**
+ * Lista os projetos acessíveis pela chave.
+ *
+ * Só funciona com chave de usuário (`uk_`); com chave de projeto (`pk_`) a API
+ * não lista nada. Devolve lista vazia em qualquer falha — o seletor cai para
+ * campo de texto livre em vez de travar a tela de caixas.
+ */
+export async function listProjects(): Promise<EverinboxProject[]> {
+  const apiKey = process.env.EVERINBOX_API_KEY;
+  if (!apiKey) return [];
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const res = await fetch(new URL("/v2/projects", BASE_URL), {
+      headers: { Authorization: apiKey, Accept: "application/json" },
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+
+    // A doc não fixa o envelope; aceitamos array puro ou { data: [...] }.
+    const body: unknown = await res.json();
+    const raw = Array.isArray(body)
+      ? body
+      : Array.isArray((body as { data?: unknown })?.data)
+        ? (body as { data: unknown[] }).data
+        : [];
+
+    return raw
+      .map((p) => {
+        const o = (p ?? {}) as Record<string, unknown>;
+        const id = o.id ?? o.uuid ?? o.project_id;
+        const name = o.name ?? o.title ?? id;
+        return id ? { id: String(id), name: String(name) } : null;
+      })
+      .filter((p): p is EverinboxProject => p !== null);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Remove um lead do projeto. `idOrEmail` aceita o id numérico ou o e-mail —
  * a API resolve os dois, então não é preciso buscar o lead antes.

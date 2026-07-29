@@ -641,6 +641,19 @@ label {
   color: inherit;
 }
 
+/* Lista de checkboxes com rolagem — projetos da Everinbox podem ser muitos. */
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+}
+
 .bulkbar {
   display: flex;
   align-items: center;

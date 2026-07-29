@@ -201,29 +201,48 @@ export async function unsubscribeContactAction(
   if (!thread.customerAddr) return "Este chamado não tem e-mail de contato.";
 
   const [mb] = await db
-    .select({ everinboxProjectId: mailboxes.everinboxProjectId })
+    .select({ everinboxProjectIds: mailboxes.everinboxProjectIds })
     .from(mailboxes)
     .where(eq(mailboxes.id, thread.mailboxId))
     .limit(1);
 
-  if (!mb?.everinboxProjectId) {
-    return "A operação desta caixa não está ligada a um projeto na Everinbox.";
+  const projetos = (mb?.everinboxProjectIds ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (projetos.length === 0) {
+    return "A operação desta caixa não está ligada a nenhum projeto na Everinbox.";
   }
 
-  try {
-    await deleteLead({
-      idOrEmail: thread.customerAddr,
-      projectId: mb.everinboxProjectId,
-    });
-  } catch (err) {
-    if (err instanceof EverinboxError && err.status === 404) {
-      return `${thread.customerAddr} já não está nesse projeto.`;
+  // Um projeto que falha não impede os outros: o contato pediu para sair de
+  // todos, e sair de alguns é melhor que sair de nenhum.
+  let removidos = 0;
+  let ausentes = 0;
+  const falhas: string[] = [];
+
+  for (const projectId of projetos) {
+    try {
+      await deleteLead({ idOrEmail: thread.customerAddr, projectId });
+      removidos++;
+    } catch (err) {
+      if (err instanceof EverinboxError && err.status === 404) {
+        ausentes++;
+      } else {
+        falhas.push(err instanceof Error ? err.message : String(err));
+      }
     }
-    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
   }
 
   revalidatePath(`/tickets/${threadId}`);
-  return `${thread.customerAddr} removido do projeto na Everinbox.`;
+
+  if (falhas.length > 0) {
+    return `Falhou em ${falhas.length} de ${projetos.length} projeto(s): ${falhas[0]}`;
+  }
+  if (removidos === 0) {
+    return `${thread.customerAddr} já não estava em nenhum dos ${projetos.length} projeto(s).`;
+  }
+  return `${thread.customerAddr} removido de ${removidos} projeto(s)${ausentes > 0 ? ` (não estava em ${ausentes})` : ""}.`;
 }
 
 /** Cria uma nova macro. */
@@ -456,8 +475,13 @@ export async function saveMailboxAction(formData: FormData) {
   const fromAddress = String(formData.get("fromAddress") ?? "").trim() || imapUser;
   const signature = String(formData.get("signature") ?? "").trim() || null;
   const siteUrl = String(formData.get("siteUrl") ?? "").trim() || null;
-  const everinboxProjectId =
-    String(formData.get("everinboxProjectId") ?? "").trim() || null;
+  // Seleção múltipla: o form manda um `everinboxProjectIds` por projeto marcado.
+  const everinboxProjectIds =
+    formData
+      .getAll("everinboxProjectIds")
+      .map((v) => String(v).trim())
+      .filter(Boolean)
+      .join(",") || null;
 
   const imapPort = Number(formData.get("imapPort")) || 993;
   const smtpPort = Number(formData.get("smtpPort")) || 465;
@@ -483,7 +507,7 @@ export async function saveMailboxAction(formData: FormData) {
     fromAddress,
     signature,
     siteUrl,
-    everinboxProjectId,
+    everinboxProjectIds,
     active,
   };
 

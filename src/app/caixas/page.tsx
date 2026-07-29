@@ -6,6 +6,7 @@ import AppShell from "@/app/_components/AppShell";
 import { fmtRelative } from "@/lib/ui";
 import MailboxManager from "./_components/MailboxManager";
 import CleanupPanel from "./_components/CleanupPanel";
+import { listProjects } from "@/lib/everinbox";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function MailboxesPage() {
       fromAddress: mailboxes.fromAddress,
       signature: mailboxes.signature,
       siteUrl: mailboxes.siteUrl,
-      everinboxProjectId: mailboxes.everinboxProjectId,
+      everinboxProjectIds: mailboxes.everinboxProjectIds,
       active: mailboxes.active,
       lastUid: mailboxes.lastUid,
     })
@@ -46,6 +47,10 @@ export default async function MailboxesPage() {
     .groupBy(threads.mailboxId);
   const countByMailbox = new Map(counts.map((c) => [c.mailboxId, c.n]));
   const totalThreads = counts.reduce((s, c) => s + c.n, 0);
+
+  // Projetos da Everinbox para o seletor. Devolve vazio se a API falhar — a
+  // tela cai para campo de texto em vez de quebrar.
+  const projects = canEdit ? await listProjects() : [];
 
   // Último log por caixa (DISTINCT ON é eficiente no Postgres).
   const logRows = await db.execute<{
@@ -156,7 +161,7 @@ export default async function MailboxesPage() {
           </div>
         )}
 
-        <MailboxManager mailboxes={rows} canEdit={canEdit} />
+        <MailboxManager mailboxes={rows} canEdit={canEdit} projects={projects} />
 
         {canEdit && <CleanupPanel total={totalThreads} />}
       </section>
