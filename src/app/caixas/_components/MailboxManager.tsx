@@ -100,11 +100,14 @@ export default function MailboxManager({
   mailboxes,
   canEdit,
   projects,
+  projectsError,
 }: {
   mailboxes: MailboxLite[];
   canEdit: boolean;
   /** Projetos da Everinbox. Vazio quando a API não respondeu. */
   projects: { id: string; name: string }[];
+  /** Por que a lista veio vazia, quando veio. */
+  projectsError?: string;
 }) {
   const [editing, setEditing] = useState<MailboxLite | null>(null);
   const formKey = editing?.id ?? "nova";
@@ -117,7 +120,9 @@ export default function MailboxManager({
   );
 
   return (
-    <div className="macro-grid">
+    // Empilhado, não em duas colunas: com IMAP, SMTP, assinatura, site e
+    // projetos, o formulário numa coluna estreita virava um scroll infinito.
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div className="card">
         <div className="card-head">
           Caixas conectadas
@@ -130,7 +135,7 @@ export default function MailboxManager({
 
         {mailboxes.length === 0 ? (
           <div className="empty">
-            Nenhuma caixa cadastrada. Adicione a primeira ao lado para a
+            Nenhuma caixa cadastrada. Cadastre a primeira abaixo para a
             ingestão começar a rodar.
           </div>
         ) : (
@@ -224,42 +229,45 @@ export default function MailboxManager({
       </div>
 
       {canEdit && (
-        <div className="card props">
-          <span className="card-title">
+        <div className="card pad">
+          <div className="card-title" style={{ marginBottom: 16 }}>
             {editing
               ? `Editando ${editing.operation || editing.label}`
               : "Nova caixa"}
-          </span>
+          </div>
 
           <form key={formKey} action={saveMailboxAction}>
             {editing && <input type="hidden" name="id" value={editing.id} />}
 
-            <div className="field">
-              <label htmlFor="operation">Operação</label>
-              <input
-                id="operation"
-                name="operation"
-                placeholder="Estação Finanças"
-                defaultValue={editing?.operation ?? ""}
-              />
-              <span className="hint">
-                Nome da operação que usa esta caixa. É o que aparece no menu
-                lateral; em branco, usa o rótulo.
-              </span>
+            <div className="form-section">Identificação</div>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="operation">Operação</label>
+                <input
+                  id="operation"
+                  name="operation"
+                  placeholder="Estação Finanças"
+                  defaultValue={editing?.operation ?? ""}
+                />
+                <span className="hint">
+                  Nome que aparece no menu lateral. Em branco, usa o rótulo.
+                </span>
+              </div>
+
+              <div className="field">
+                <label htmlFor="label">Rótulo</label>
+                <input
+                  id="label"
+                  name="label"
+                  required
+                  placeholder="Suporte"
+                  defaultValue={editing?.label ?? ""}
+                />
+                <span className="hint">Nome interno da caixa.</span>
+              </div>
             </div>
 
-            <div className="field">
-              <label htmlFor="label">Rótulo</label>
-              <input
-                id="label"
-                name="label"
-                required
-                placeholder="Suporte"
-                defaultValue={editing?.label ?? ""}
-              />
-            </div>
-
-            <div className="hr" />
+            <div className="form-section">Recebimento (IMAP)</div>
 
             <div className="field">
               <label htmlFor="imapHost">Servidor IMAP</label>
@@ -313,7 +321,7 @@ export default function MailboxManager({
               <span>IMAP com TLS</span>
             </label>
 
-            <div className="hr" style={{ margin: "16px 0" }} />
+            <div className="form-section">Envio (SMTP)</div>
 
             <div className="field">
               <label htmlFor="smtpHost">Servidor SMTP</label>
@@ -364,17 +372,33 @@ export default function MailboxManager({
               <span>SMTP com TLS</span>
             </label>
 
-            <div className="hr" style={{ margin: "16px 0" }} />
+            <div className="form-section">Identidade das respostas</div>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="fromAddress">Endereço de envio</label>
+                <input
+                  id="fromAddress"
+                  name="fromAddress"
+                  placeholder="igual ao usuário IMAP"
+                  defaultValue={editing?.fromAddress ?? ""}
+                />
+              </div>
 
-            <div className="field">
-              <label htmlFor="fromAddress">Endereço de envio</label>
-              <input
-                id="fromAddress"
-                name="fromAddress"
-                placeholder="igual ao usuário IMAP"
-                defaultValue={editing?.fromAddress ?? ""}
-              />
+              <div className="field">
+                <label htmlFor="siteUrl">Site da operação</label>
+                <input
+                  id="siteUrl"
+                  name="siteUrl"
+                  type="url"
+                  placeholder="https://br.estacaofinancas.com"
+                  defaultValue={editing?.siteUrl ?? ""}
+                />
+                <span className="hint">
+                  A IA lê o sitemap dele para responder com base nos posts.
+                </span>
+              </div>
             </div>
+
             <div className="field">
               <label htmlFor="signature">Assinatura</label>
               <textarea
@@ -390,19 +414,7 @@ export default function MailboxManager({
               </span>
             </div>
 
-            <div className="field">
-              <label htmlFor="siteUrl">Site da operação</label>
-              <input
-                id="siteUrl"
-                name="siteUrl"
-                type="url"
-                placeholder="https://br.estacaofinancas.com"
-                defaultValue={editing?.siteUrl ?? ""}
-              />
-              <span className="hint">
-                A IA lê o sitemap deste site para responder com base nos posts.
-              </span>
-            </div>
+            <div className="form-section">Everinbox</div>
 
             <div className="field">
               <label>Projetos na Everinbox</label>
@@ -415,10 +427,8 @@ export default function MailboxManager({
                     defaultValue={editing?.everinboxProjectIds ?? ""}
                   />
                   <span className="hint">
-                    Não consegui listar os projetos da Everinbox — confira a
-                    EVERINBOX_API_KEY (precisa ser chave de usuário, prefixo
-                    <span className="mono"> uk_</span>). Enquanto isso, cole os
-                    ids separados por vírgula.
+                    Não consegui listar os projetos: {projectsError ?? "motivo desconhecido"}.
+                    Enquanto isso, cole os ids separados por vírgula.
                   </span>
                 </>
               ) : (

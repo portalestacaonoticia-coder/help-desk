@@ -641,6 +641,28 @@ label {
   color: inherit;
 }
 
+/* Formulário largo: campos lado a lado em vez de uma coluna infinita. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0 16px;
+}
+.form-section {
+  margin: 22px 0 12px;
+  padding-top: 16px;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+.form-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 /* Lista de checkboxes com rolagem — projetos da Everinbox podem ser muitos. */
 .check-list {
   display: flex;

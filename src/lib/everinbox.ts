@@ -34,9 +34,13 @@ export type EverinboxProject = { id: string; name: string };
  * não lista nada. Devolve lista vazia em qualquer falha — o seletor cai para
  * campo de texto livre em vez de travar a tela de caixas.
  */
-export async function listProjects(): Promise<EverinboxProject[]> {
+export async function listProjects(): Promise<{
+  projects: EverinboxProject[];
+  /** Motivo da falha, para aparecer na tela em vez de sumir. */
+  error?: string;
+}> {
   const apiKey = process.env.EVERINBOX_API_KEY;
-  if (!apiKey) return [];
+  if (!apiKey) return { projects: [], error: "EVERINBOX_API_KEY não definida" };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -47,17 +51,46 @@ export async function listProjects(): Promise<EverinboxProject[]> {
       signal: controller.signal,
       cache: "no-store",
     });
-    if (!res.ok) return [];
 
-    // A doc não fixa o envelope; aceitamos array puro ou { data: [...] }.
-    const body: unknown = await res.json();
+    const texto = await res.text();
+    if (!res.ok) {
+      return {
+        projects: [],
+        error: `GET /v2/projects respondeu ${res.status}: ${texto.slice(0, 200)}`,
+      };
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(texto);
+    } catch {
+      return { projects: [], error: `Resposta não é json: ${texto.slice(0, 200)}` };
+    }
+
+    // O endpoint não está descrito no OpenAPI, então o envelope é incerto:
+    // aceitamos array puro ou objeto com uma das chaves usuais.
+    const env = (body ?? {}) as Record<string, unknown>;
     const raw = Array.isArray(body)
       ? body
-      : Array.isArray((body as { data?: unknown })?.data)
-        ? (body as { data: unknown[] }).data
-        : [];
+      : Array.isArray(env.data)
+        ? env.data
+        : Array.isArray(env.projects)
+          ? env.projects
+          : Array.isArray(env.items)
+            ? env.items
+            : Array.isArray(env.results)
+              ? env.results
+              : null;
 
-    return raw
+    if (raw === null) {
+      // Mostra as chaves recebidas: é o suficiente para acertar o parsing.
+      return {
+        projects: [],
+        error: `Formato inesperado. Chaves: ${Object.keys(env).join(", ") || "(vazio)"}`,
+      };
+    }
+
+    const projects = raw
       .map((p) => {
         const o = (p ?? {}) as Record<string, unknown>;
         const id = o.id ?? o.uuid ?? o.project_id;
@@ -65,8 +98,13 @@ export async function listProjects(): Promise<EverinboxProject[]> {
         return id ? { id: String(id), name: String(name) } : null;
       })
       .filter((p): p is EverinboxProject => p !== null);
-  } catch {
-    return [];
+
+    return { projects };
+  } catch (err) {
+    return {
+      projects: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
   } finally {
     clearTimeout(timer);
   }
