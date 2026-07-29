@@ -336,6 +336,55 @@ export async function ingestMailbox(mb: Mailbox): Promise<IngestResult> {
 }
 
 /**
+ * Move o ponteiro para o fim da INBOX: descarta o backlog e passa a ingerir
+ * só o que chegar a partir de agora.
+ *
+ * O valor vem do servidor (`uidNext`), nunca de chute: um número alto demais
+ * faria a caixa ignorar e-mails novos permanentemente, sem aviso.
+ *
+ * Retorna o novo `last_uid`.
+ */
+export async function skipToLatest(mb: Mailbox): Promise<number> {
+  const client = new ImapFlow({
+    host: mb.imapHost,
+    port: mb.imapPort,
+    secure: mb.imapTls,
+    auth: { user: mb.imapUser, pass: decryptSecret(mb.imapPassEnc) },
+    logger: false,
+  });
+
+  await client.connect();
+  try {
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      const info = client.mailbox;
+      if (!info || typeof info === "boolean") {
+        throw new Error("Não foi possível ler o estado da INBOX");
+      }
+
+      // uidNext é o UID que a PRÓXIMA mensagem receberá. Menos um = a última
+      // que já está lá, que é exatamente onde queremos parar de ler.
+      const uidNext = Number(info.uidNext);
+      if (!Number.isFinite(uidNext) || uidNext < 1) {
+        throw new Error("Servidor não informou uidNext");
+      }
+      const novoLastUid = uidNext - 1;
+
+      await db
+        .update(mailboxes)
+        .set({ lastUid: novoLastUid, uidValidity: String(info.uidValidity) })
+        .where(eq(mailboxes.id, mb.id));
+
+      return novoLastUid;
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await disconnect(client);
+  }
+}
+
+/**
  * Testa as credenciais IMAP de uma caixa sem ler mensagens.
  * Usado pelo botão "testar conexão" da tela de caixas.
  */

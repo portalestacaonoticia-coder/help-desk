@@ -19,7 +19,7 @@ import { sendReply, verifySmtp } from "@/lib/smtp";
 import { encryptSecret } from "@/lib/crypto";
 import { suggestReplyForMessage, getAiSettings } from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
-import { verifyImap } from "@/lib/imap";
+import { verifyImap, skipToLatest } from "@/lib/imap";
 import { deleteLead, EverinboxError } from "@/lib/everinbox";
 import { isCategory } from "@/lib/ui";
 
@@ -226,6 +226,32 @@ export async function unsubscribeContactAction(
 }
 
 /** Cria uma nova macro. */
+/**
+ * Descarta o backlog da caixa: o ponteiro pula para o fim da INBOX e só
+ * e-mails novos passam a ser ingeridos.
+ *
+ * Sem volta pela aplicação — os e-mails anteriores continuam no servidor, mas
+ * o Help Desk não os lerá mais.
+ */
+export async function skipBacklogAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+
+  const [mb] = await db.select().from(mailboxes).where(eq(mailboxes.id, id)).limit(1);
+  if (!mb) return "Caixa não encontrada.";
+
+  try {
+    const novoUid = await skipToLatest(mb);
+    revalidatePath("/caixas");
+    return `Ponteiro movido para o UID ${novoUid}. Só e-mails novos daqui em diante.`;
+  } catch (err) {
+    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
 /** Cria ou edita uma resposta pronta. Com `id` no form, edita. */
 export async function saveMacroAction(formData: FormData) {
   await requireUser();

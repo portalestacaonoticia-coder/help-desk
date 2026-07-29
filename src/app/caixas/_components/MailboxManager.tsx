@@ -2,7 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { saveMailboxAction, testMailboxAction } from "@/app/actions";
+import {
+  saveMailboxAction,
+  testMailboxAction,
+  skipBacklogAction,
+} from "@/app/actions";
 
 export type MailboxLite = {
   id: number;
@@ -49,6 +53,38 @@ function TestConnection({ id }: { id: number }) {
       <input type="hidden" name="id" value={id} />
       <button type="submit" disabled={pending}>
         {pending ? "Testando…" : "Testar conexão"}
+      </button>
+      {result && (
+        <span className={failed ? "error" : "ok-text"} style={{ fontSize: 12 }}>
+          {result}
+        </span>
+      )}
+    </form>
+  );
+}
+
+/**
+ * Pula o backlog: passa a ingerir só o que chegar a partir de agora.
+ * Não apaga nada, mas os e-mails anteriores nunca mais serão lidos.
+ */
+function SkipBacklog({ id, lastUid }: { id: number; lastUid: number }) {
+  const [result, action, pending] = useActionState(skipBacklogAction, undefined);
+  const failed = result?.startsWith("Falhou");
+
+  return (
+    <form
+      action={action}
+      style={{ display: "flex", alignItems: "center", gap: 10 }}
+      onSubmit={(e) => {
+        const ok = window.confirm(
+          `Pular o backlog desta caixa?\n\nO ponteiro sai do UID ${lastUid} e vai para o fim da INBOX. Os e-mails anteriores continuam no servidor, mas o Help Desk não vai mais lê-los. Não dá para desfazer pela aplicação.`,
+        );
+        if (!ok) e.preventDefault();
+      }}
+    >
+      <input type="hidden" name="id" value={id} />
+      <button type="submit" disabled={pending}>
+        {pending ? "Pulando…" : "Pular backlog"}
       </button>
       {result && (
         <span className={failed ? "error" : "ok-text"} style={{ fontSize: 12 }}>
@@ -159,8 +195,16 @@ export default function MailboxManager({
               )}
 
               {canEdit && (
-                <div style={{ marginTop: 12 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
                   <TestConnection id={mb.id} />
+                  <SkipBacklog id={mb.id} lastUid={mb.lastUid} />
                 </div>
               )}
             </div>
