@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { threads, mailboxes, messages } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
 import TicketTable from "./_components/TicketTable";
+import PerPageSelect from "./_components/PerPageSelect";
 import { auth } from "@/lib/auth";
 import { STATUS_LABELS } from "@/lib/ui";
 
@@ -181,16 +182,8 @@ export default async function TicketsPage({
               ))}
             </select>
           </div>
-          <div>
-            <label htmlFor="f-per">Por página</label>
-            <select id="f-per" name="per" defaultValue={String(perPage)}>
-              {PER_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* `per` viaja escondido: o controle dele fica no paginador. */}
+          <input type="hidden" name="per" value={String(perPage)} />
           <div>
             <button type="submit" className="primary">
               Filtrar
@@ -226,21 +219,19 @@ export default async function TicketsPage({
               : `Mostrando ${firstItem}–${lastItem} de ${total}`}
           </div>
 
-          <div className="pager-per">
-            <span className="pager-label">Por página</span>
-            {PER_OPTIONS.map((n) => (
-              <Link
-                key={n}
-                href={hrefWith({
+          <PerPageSelect
+            options={PER_OPTIONS}
+            value={perPage}
+            hrefFor={Object.fromEntries(
+              PER_OPTIONS.map((n) => [
+                n,
+                hrefWith({
                   per: n === DEFAULT_PER ? undefined : String(n),
                   page: undefined,
-                })}
-                className={`chip${n === perPage ? " active" : ""}`}
-              >
-                {n}
-              </Link>
-            ))}
-          </div>
+                }),
+              ]),
+            )}
+          />
 
           <div className="pager-nav">
             {page > 1 ? (
