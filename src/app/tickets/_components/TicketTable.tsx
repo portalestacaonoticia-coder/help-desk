@@ -16,6 +16,8 @@ export type TicketRow = {
   mailboxId: number;
   mailboxLabel: string;
   preview: string;
+  /** A última mensagem da conversa é nossa, não do cliente. */
+  answered: boolean;
 };
 
 function DeleteButton({ count }: { count: number }) {
@@ -129,11 +131,21 @@ export default function TicketTable({
                 #{t.id}
               </Link>
               <Link href={`/tickets/${t.id}`} style={{ minWidth: 0 }}>
-                <div className="t-subject">{t.subject || "(sem assunto)"}</div>
+                <div className="t-subject">
+                  {t.subject || "(sem assunto)"}
+                  {t.answered && <span className="badge ok">Respondido</span>}
+                </div>
                 <div className="t-preview">
                   {t.customerAddr ? `${t.customerAddr} · ` : ""}
                   {fmtRelative(t.lastMessageAt)}
-                  {t.preview ? ` · ${t.preview}` : ""}
+                  {t.preview ? (
+                    <>
+                      {" · "}
+                      {/* Deixa claro de quem é o texto da prévia. */}
+                      {t.answered && <strong>Nossa resposta: </strong>}
+                      {t.preview}
+                    </>
+                  ) : null}
                 </div>
               </Link>
               <div>

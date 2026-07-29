@@ -641,6 +641,13 @@ label {
   color: inherit;
 }
 
+/* Selo "Respondido" ao lado do assunto na fila. */
+.t-subject .badge {
+  margin-left: 8px;
+  vertical-align: middle;
+  font-size: 10px;
+}
+
 /* Formulário largo: campos lado a lado em vez de uma coluna infinita. */
 .form-grid {
   display: grid;

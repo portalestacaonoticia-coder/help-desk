@@ -91,17 +91,26 @@ export default async function TicketsPage({
     .offset(offset);
 
   // Prévia da última mensagem por thread (DISTINCT ON é eficiente no Postgres).
+  // A direção vem junto: sem ela, a nossa própria resposta aparecia na fila
+  // como se fosse a fala do cliente.
   const ids = rows.map((r) => r.id);
-  const previews = new Map<number, string>();
+  const previews = new Map<number, { text: string; outbound: boolean }>();
   if (ids.length > 0) {
-    const prevRows = await db.execute<{ thread_id: number; body_text: string | null }>(
-      sql`select distinct on (thread_id) thread_id, body_text
+    const prevRows = await db.execute<{
+      thread_id: number;
+      body_text: string | null;
+      direction: string;
+    }>(
+      sql`select distinct on (thread_id) thread_id, body_text, direction
           from ${messages}
           where thread_id in ${ids}
           order by thread_id, created_at desc`,
     );
     for (const r of prevRows) {
-      previews.set(Number(r.thread_id), (r.body_text ?? "").replace(/\s+/g, " ").trim());
+      previews.set(Number(r.thread_id), {
+        text: (r.body_text ?? "").replace(/\s+/g, " ").trim(),
+        outbound: r.direction === "outbound",
+      });
     }
   }
 
@@ -219,7 +228,11 @@ export default async function TicketsPage({
 
         <TicketTable
           canDelete={canDelete}
-          rows={rows.map((t) => ({ ...t, preview: previews.get(t.id) ?? "" }))}
+          rows={rows.map((t) => ({
+            ...t,
+            preview: previews.get(t.id)?.text ?? "",
+            answered: previews.get(t.id)?.outbound ?? false,
+          }))}
         />
 
         <div className="pager">
