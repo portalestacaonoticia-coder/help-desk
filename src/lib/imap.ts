@@ -120,7 +120,12 @@ function toMessageRow(parsed: ParsedMail, uid: number, mailboxId: number) {
     toAddr,
     subject: parsed.subject ?? null,
     bodyText: parsed.text ?? null,
-    bodyHtml: typeof parsed.html === "string" ? parsed.html : null,
+    // HTML do e-mail recebido NÃO é guardado: nada na aplicação lê body_html
+    // de mensagem inbound (a thread renderiza body_text), e em e-mail de
+    // marketing ele é 10-20x maior que o texto. Foram esses megabytes que
+    // estouraram o limite do Neon. Respostas enviadas continuam guardando o
+    // html delas, que é pequeno e serve de registro do que saiu.
+    bodyHtml: null,
     imapUid: uid,
     sentAt: parsed.date ?? null,
   };
