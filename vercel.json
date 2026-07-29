@@ -4,10 +4,17 @@
     {
       "path": "/api/cron/ingest",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "20 6 * * *"
     }
   ],
   "functions": {
     "src/app/api/cron/ingest/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/cleanup/route.ts": {
       "maxDuration": 60
     }
   }

@@ -47,7 +47,17 @@ export default async function TicketsPage({
   if (q) {
     const like = `%${q}%`;
     conditions.push(
-      or(ilike(threads.subject, like), ilike(threads.customerAddr, like))!,
+      or(
+        ilike(threads.subject, like),
+        ilike(threads.customerAddr, like),
+        // Corpo do e-mail. EXISTS em vez de join: uma thread com 10 mensagens
+        // casando não pode aparecer 10 vezes na fila nem inflar o total.
+        sql`exists (
+          select 1 from ${messages} m
+          where m.thread_id = ${threads.id}
+            and m.body_text ilike ${like}
+        )`,
+      )!,
     );
   }
   const where = conditions.length ? and(...conditions) : undefined;
