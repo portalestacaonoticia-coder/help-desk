@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Help Desk — Tihee",
   description: "Central de suporte por e-mail",
-  icons: { icon: "/tihee-mark.svg" },
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({
