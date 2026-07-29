@@ -165,6 +165,30 @@ export async function setCategoryAction(
 }
 
 /**
+ * Muda o status de vários chamados de uma vez.
+ *
+ * Não exige admin, ao contrário da remoção: mudar status é reversível em um
+ * clique, apagar não.
+ */
+export async function bulkSetStatusAction(formData: FormData) {
+  await requireUser();
+
+  const status = String(formData.get("status") ?? "");
+  if (!VALID_STATUS.includes(status as (typeof VALID_STATUS)[number])) {
+    throw new Error("Status inválido");
+  }
+
+  const ids = formData
+    .getAll("ids")
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (ids.length === 0) return;
+
+  await db.update(threads).set({ status }).where(inArray(threads.id, ids));
+  revalidatePath("/tickets");
+}
+
+/**
  * Remove chamados em lote. DESTRUTIVO e sem desfazer: apaga também as
  * mensagens e as análises da IA de cada thread.
  *

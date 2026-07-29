@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
-import { deleteThreadsAction } from "@/app/actions";
+import { deleteThreadsAction, bulkSetStatusAction } from "@/app/actions";
 import { STATUS_LABELS, colorClass, fmtRelative } from "@/lib/ui";
 
 export type TicketRow = {
@@ -23,7 +23,14 @@ export type TicketRow = {
 function DeleteButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="danger" disabled={pending}>
+    <button
+      type="submit"
+      className="danger"
+      disabled={pending}
+      // formAction sobrescreve a action do form só para este botão.
+      formAction={deleteThreadsAction}
+      data-acao="remover"
+    >
       {pending
         ? "Removendo…"
         : `Remover ${count} selecionad${count === 1 ? "o" : "os"}`}
@@ -59,17 +66,27 @@ export default function TicketTable({
 
   return (
     <form
-      action={deleteThreadsAction}
+      action={bulkSetStatusAction}
       onSubmit={(e) => {
-        const n = selected.size;
-        const ok = window.confirm(
-          `Remover ${n} chamado${n === 1 ? "" : "s"}? As mensagens e os rascunhos da IA também são apagados. Não dá para desfazer.`,
-        );
-        if (!ok) e.preventDefault();
-        else setSelected(new Set());
+        // Qual botão disparou decide se precisa confirmar: mudar status é
+        // reversível, apagar não.
+        const submitter = (e.nativeEvent as SubmitEvent)
+          .submitter as HTMLButtonElement | null;
+
+        if (submitter?.dataset.acao === "remover") {
+          const n = selected.size;
+          const ok = window.confirm(
+            `Remover ${n} resposta${n === 1 ? "" : "s"}? As mensagens e os rascunhos da IA também são apagados. Não dá para desfazer.`,
+          );
+          if (!ok) {
+            e.preventDefault();
+            return;
+          }
+        }
+        setSelected(new Set());
       }}
     >
-      {canDelete && selected.size > 0 && (
+      {selected.size > 0 && (
         <div className="bulkbar">
           <span>
             {selected.size} selecionad{selected.size === 1 ? "o" : "os"}
@@ -78,23 +95,26 @@ export default function TicketTable({
             <button type="button" onClick={() => setSelected(new Set())}>
               Limpar seleção
             </button>
-            <DeleteButton count={selected.size} />
+            {Object.entries(STATUS_LABELS).map(([valor, rotulo]) => (
+              <button key={valor} type="submit" name="status" value={valor}>
+                Marcar como {rotulo.toLowerCase()}
+              </button>
+            ))}
+            {canDelete && <DeleteButton count={selected.size} />}
           </div>
         </div>
       )}
 
       <div className="card table">
-        <div className={`trow thead${canDelete ? " selectable" : ""}`}>
-          {canDelete && (
-            <div>
-              <input
-                type="checkbox"
-                aria-label="Selecionar todos desta página"
-                checked={allSelected}
-                onChange={toggleAll}
-              />
-            </div>
-          )}
+        <div className="trow thead selectable">
+          <div>
+            <input
+              type="checkbox"
+              aria-label="Selecionar todos desta página"
+              checked={allSelected}
+              onChange={toggleAll}
+            />
+          </div>
           <div>ID</div>
           <div>Assunto</div>
           <div>Operação</div>
@@ -111,22 +131,18 @@ export default function TicketTable({
           rows.map((t) => (
             <div
               key={t.id}
-              className={`trow${canDelete ? " selectable" : ""}${
-                selected.has(t.id) ? " selected" : ""
-              }`}
+              className={`trow selectable${selected.has(t.id) ? " selected" : ""}`}
             >
-              {canDelete && (
-                <div>
-                  <input
-                    type="checkbox"
-                    name="ids"
-                    value={t.id}
-                    aria-label={`Selecionar chamado ${t.id}`}
-                    checked={selected.has(t.id)}
-                    onChange={() => toggle(t.id)}
-                  />
-                </div>
-              )}
+              <div>
+                <input
+                  type="checkbox"
+                  name="ids"
+                  value={t.id}
+                  aria-label={`Selecionar resposta ${t.id}`}
+                  checked={selected.has(t.id)}
+                  onChange={() => toggle(t.id)}
+                />
+              </div>
               <Link href={`/tickets/${t.id}`} className="mono t-meta">
                 #{t.id}
               </Link>
