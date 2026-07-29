@@ -6,7 +6,7 @@ import { threads, mailboxes, messages, macros } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
 import ReplyArea from "./_components/ReplyArea";
 import UnsubscribeButton from "./_components/UnsubscribeButton";
-import { setStatusAction, setCategoryAction } from "@/app/actions";
+import { StatusForm, CategoryForm } from "./_components/PropertyForms";
 import {
   getAiSettingsSafe,
   getLatestSuggestion,
@@ -15,7 +15,6 @@ import {
 import { isAiConfigured } from "@/lib/deepseek";
 import {
   STATUS_LABELS,
-  CATEGORIES,
   colorClass,
   fmtDateTime,
   fmtRelative,
@@ -162,42 +161,11 @@ export default async function TicketPage({
             <div className="card props">
               <span className="card-title">Propriedades</span>
 
-              <form action={setStatusAction}>
-                <input type="hidden" name="threadId" value={threadId} />
-                <label htmlFor="status">Status</label>
-                <select id="status" name="status" defaultValue={thread.status}>
-                  {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" style={{ marginTop: 8, width: "100%" }}>
-                  Atualizar status
-                </button>
-              </form>
+              <StatusForm threadId={threadId} status={thread.status} />
 
               <div className="hr" />
 
-              <form action={setCategoryAction} style={{ marginTop: 14 }}>
-                <input type="hidden" name="threadId" value={threadId} />
-                <label htmlFor="category">Categoria</label>
-                <select
-                  id="category"
-                  name="category"
-                  defaultValue={thread.category ?? ""}
-                >
-                  <option value="">Sem categoria</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" style={{ marginTop: 8, width: "100%" }}>
-                  Atualizar categoria
-                </button>
-              </form>
+              <CategoryForm threadId={threadId} category={thread.category} />
 
               <div className="hr" />
 

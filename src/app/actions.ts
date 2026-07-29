@@ -22,7 +22,7 @@ import { isAiConfigured } from "@/lib/deepseek";
 import { verifyImap, skipToLatest } from "@/lib/imap";
 import { runCleanup } from "@/lib/retention";
 import { deleteLead, EverinboxError } from "@/lib/everinbox";
-import { isCategory } from "@/lib/ui";
+import { isCategory, STATUS_LABELS } from "@/lib/ui";
 
 const VALID_STATUS = ["aberto", "fechado"] as const;
 
@@ -107,42 +107,61 @@ export async function replyAction(formData: FormData) {
   revalidatePath("/tickets");
 }
 
-/** Muda o status da thread. */
-export async function setStatusAction(formData: FormData) {
+/**
+ * Muda o status da thread.
+ *
+ * Devolve mensagem em vez de lançar: sem retorno, uma falha no banco não
+ * aparecia na tela — o clique simplesmente não fazia nada.
+ */
+export async function setStatusAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
   await requireUser();
   const threadId = Number(formData.get("threadId"));
   const status = String(formData.get("status") ?? "");
 
   if (!VALID_STATUS.includes(status as (typeof VALID_STATUS)[number])) {
-    throw new Error("Status inválido");
+    return "Status inválido.";
   }
 
-  await db.update(threads).set({ status }).where(eq(threads.id, threadId));
+  try {
+    await db.update(threads).set({ status }).where(eq(threads.id, threadId));
+  } catch (err) {
+    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
 
   revalidatePath(`/tickets/${threadId}`);
   revalidatePath("/tickets");
+  return `Status alterado para ${STATUS_LABELS[status] ?? status}.`;
 }
 
 /**
- * Define a categoria do chamado. Aceita vazio para "sem categoria" e só grava
- * nomes que existem em `categories` e estão ativos — o valor vem de um select,
- * mas a validação não pode confiar no cliente.
+ * Define a categoria do chamado. Vazio limpa a categoria. A lista é fixa em
+ * lib/ui — o valor vem de um select, mas a validação não confia no cliente.
  */
-export async function setCategoryAction(formData: FormData) {
+export async function setCategoryAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
   await requireUser();
   const threadId = Number(formData.get("threadId"));
   const category = String(formData.get("category") ?? "").trim();
 
-  // A lista é fixa em lib/ui — não confiar no valor que veio do select.
-  if (category && !isCategory(category)) throw new Error("Categoria inválida");
+  if (category && !isCategory(category)) return "Categoria inválida.";
 
-  await db
-    .update(threads)
-    .set({ category: category || null })
-    .where(eq(threads.id, threadId));
+  try {
+    await db
+      .update(threads)
+      .set({ category: category || null })
+      .where(eq(threads.id, threadId));
+  } catch (err) {
+    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
 
   revalidatePath(`/tickets/${threadId}`);
   revalidatePath("/tickets");
+  return category ? `Categoria: ${category}.` : "Categoria removida.";
 }
 
 /**
