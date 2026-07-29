@@ -187,6 +187,8 @@ function buildSystemPrompt(
   settings: AiSettings,
   cats: Array<{ name: string; description: string | null }>,
   articles: KbArticle[],
+  /** Só true quando ESTA geração pode terminar em envio sem revisão. */
+  podeEnviarSozinha: boolean,
 ): string {
   const base = settings.basePrompt.trim() || DEFAULT_BASE_PROMPT;
 
@@ -205,9 +207,11 @@ function buildSystemPrompt(
         .join("\n\n")
     : "(nenhum artigo relevante encontrado na base)";
 
-  // Só entra quando a resposta vai de fato sair sem ninguém olhar.
+  // Só entra quando a resposta pode de fato sair sem ninguém olhar. Rascunho
+  // pedido pelo agente segue só o prompt base: as regras do envio automático
+  // são mais restritivas e deixariam o rascunho evasivo à toa.
   const autoBlock =
-    settings.autoSendEnabled && settings.autoSendPrompt.trim()
+    podeEnviarSozinha && settings.autoSendPrompt.trim()
       ? `\n\n## Envio automático (esta resposta vai ao cliente SEM revisão humana)\n${settings.autoSendPrompt.trim()}`
       : "";
 
@@ -293,10 +297,19 @@ function normalizeSuggestion(raw: unknown): Suggestion {
  * Gera um rascunho de resposta para a última mensagem recebida de uma thread
  * e grava o resultado em `ai_actions`.
  *
- * Sempre rascunho: esta função NUNCA envia e-mail. O envio continua sendo um
- * clique do agente, mesmo quando a categoria é auto-respondível.
+ * `permitirEnvio` separa os dois usos. O cron passa true: ali a resposta pode
+ * sair sozinha, se a trava mestra estiver ligada e a IA liberar. O botão
+ * "gerar rascunho" do agente passa false, e aí a geração é só rascunho — o
+ * prompt do envio automático nem entra, porque as regras dele são mais
+ * restritivas e tornariam o rascunho evasivo sem necessidade.
+ *
+ * O padrão é false de propósito: um novo ponto de chamada que esqueça o
+ * parâmetro gera rascunho, nunca dispara e-mail.
  */
-export async function suggestReplyForMessage(messageId: number): Promise<{
+export async function suggestReplyForMessage(
+  messageId: number,
+  permitirEnvio = false,
+): Promise<{
   ok: boolean;
   error?: string;
 }> {
@@ -347,7 +360,10 @@ export async function suggestReplyForMessage(messageId: number): Promise<{
   const haystack = `${thread?.subject ?? ""} ${msg.bodyText ?? ""}`;
   const relevant = rankArticles(haystack, allArticles);
 
-  const system = buildSystemPrompt(settings, cats, relevant);
+  // A trava mestra sozinha não basta: o rascunho manual nunca envia.
+  const podeEnviarSozinha = permitirEnvio && settings.autoSendEnabled;
+
+  const system = buildSystemPrompt(settings, cats, relevant, podeEnviarSozinha);
   const user = buildUserPrompt(thread?.subject ?? msg.subject, history);
 
   try {
@@ -376,7 +392,7 @@ export async function suggestReplyForMessage(messageId: number): Promise<{
     // vir true explicitamente. Json quebrado, campo ausente ou resposta
     // inesperada caem no rascunho — a falha nunca resulta em e-mail enviado.
     const podeAutoEnviar =
-      settings.autoSendEnabled &&
+      podeEnviarSozinha &&
       s.posso_enviar &&
       !s.precisa_humano &&
       s.resposta.trim().length > 0;
@@ -481,7 +497,8 @@ export async function processPendingMessages(limit = 20): Promise<{
   let processed = 0;
   let failed = 0;
   for (const m of pending) {
-    const result = await suggestReplyForMessage(m.id);
+    // Caminho do cron: aqui a resposta pode sair sozinha, se a trava permitir.
+    const result = await suggestReplyForMessage(m.id, true);
     if (result.ok) processed++;
     else failed++;
   }
