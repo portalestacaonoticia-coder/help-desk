@@ -425,13 +425,10 @@ export async function suggestReplyForMessage(messageId: number): Promise<{
       })
       .onConflictDoNothing();
 
-    // Grava a categoria na thread quando ela ainda não tem uma.
-    if (categoria && thread && !thread.category) {
-      await db
-        .update(threads)
-        .set({ category: categoria })
-        .where(eq(threads.id, thread.id));
-    }
+    // A categoria da thread é do AGENTE, não da IA: fica vazia até alguém
+    // escolher na tela do chamado. O palpite do modelo continua registrado em
+    // ai_actions.category_suggested, como trilha de auditoria, sem vazar para
+    // a fila.
 
     return { ok: true };
   } catch (err) {

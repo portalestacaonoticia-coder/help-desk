@@ -1,7 +1,7 @@
 import { and, eq, asc, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { threads, mailboxes } from "@/db/schema";
+import { threads, mailboxes, messages } from "@/db/schema";
 import { initials } from "@/lib/ui";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
@@ -25,13 +25,16 @@ export default async function AppShell({
     .from(threads)
     .where(eq(threads.status, "aberto"));
 
-  // Respostas criadas hoje. O corte é a meia-noite de São Paulo, não do UTC
-  // em que o servidor roda — senão o "dia" vira às 21h.
+  // Respostas recebidas hoje, pela data do E-MAIL (sent_at) e não pela hora em
+  // que o cron leu: com a ingestão atrasada, contar created_at mede o cron, não
+  // o movimento do dia. O corte é a meia-noite de São Paulo — em UTC o "dia"
+  // viraria às 21h.
   const [{ n: todayCount }] = await db
     .select({ n: sql<number>`count(*)::int` })
-    .from(threads)
+    .from(messages)
     .where(
-      sql`${threads.createdAt} >= (date_trunc('day', now() at time zone 'America/Sao_Paulo')) at time zone 'America/Sao_Paulo'`,
+      sql`${messages.direction} = 'inbound'
+          and ${messages.sentAt} >= (date_trunc('day', now() at time zone 'America/Sao_Paulo')) at time zone 'America/Sao_Paulo'`,
     );
 
   // Uma entrada de menu por operação (caixa ativa), com sua fila em aberto.

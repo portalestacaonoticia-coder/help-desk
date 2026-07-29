@@ -160,7 +160,7 @@ export default function Sidebar({
             <span>Total de respostas</span>
           </div>
           <div className="num">{todayCount}</div>
-          <div className="sub">criadas hoje</div>
+          <div className="sub">recebidas hoje</div>
         </div>
 
         <div className="agent">
