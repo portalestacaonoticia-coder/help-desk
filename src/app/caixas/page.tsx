@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import AppShell from "@/app/_components/AppShell";
 import { fmtRelative } from "@/lib/ui";
 import MailboxManager from "./_components/MailboxManager";
+import CleanupPanel from "./_components/CleanupPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export default async function MailboxesPage() {
     .from(threads)
     .groupBy(threads.mailboxId);
   const countByMailbox = new Map(counts.map((c) => [c.mailboxId, c.n]));
+  const totalThreads = counts.reduce((s, c) => s + c.n, 0);
 
   // Último log por caixa (DISTINCT ON é eficiente no Postgres).
   const logRows = await db.execute<{
@@ -155,6 +157,8 @@ export default async function MailboxesPage() {
         )}
 
         <MailboxManager mailboxes={rows} canEdit={canEdit} />
+
+        {canEdit && <CleanupPanel total={totalThreads} />}
       </section>
     </AppShell>
   );

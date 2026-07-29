@@ -119,6 +119,78 @@ export async function runRetention(): Promise<RetentionResult> {
   return { corposLimpos, threadsApagadas, concluido };
 }
 
+export type CleanupFilter = {
+  /** Idade mínima em dias. Sempre aplicada — evita apagar o movimento do dia. */
+  dias: number;
+  somenteFechadas: boolean;
+  semResposta: boolean;
+};
+
+/** Monta o filtro compartilhado entre a contagem e a remoção. */
+function cleanupWhere(f: CleanupFilter) {
+  const cutoff = new Date(Date.now() - f.dias * 24 * 60 * 60 * 1000);
+  const conds = [lt(threads.lastMessageAt, cutoff)];
+  if (f.somenteFechadas) conds.push(eq(threads.status, "fechado"));
+  if (f.semResposta) conds.push(eq(threads.category, "Sem Resposta"));
+  return and(...conds);
+}
+
+/** Quantas respostas o filtro atinge. Mostrado antes de apagar. */
+export async function countCleanup(f: CleanupFilter): Promise<number> {
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(threads)
+    .where(cleanupWhere(f));
+  return n;
+}
+
+/**
+ * Remove as respostas que casam com o filtro, junto com suas mensagens e
+ * análises da IA. DESTRUTIVO e sem desfazer.
+ *
+ * Em lotes por dois motivos: com o banco no teto, transação grande falha por
+ * falta de espaço; e o orçamento de tempo impede estourar o limite da função.
+ */
+export async function runCleanup(f: CleanupFilter): Promise<{
+  removidas: number;
+  concluido: boolean;
+}> {
+  const startedAt = Date.now();
+  let removidas = 0;
+
+  while (Date.now() - startedAt <= TIME_BUDGET_MS) {
+    const alvo = await db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(cleanupWhere(f))
+      .limit(BATCH);
+    if (alvo.length === 0) break;
+
+    const ids = alvo.map((t) => t.id);
+    const msgIds = (
+      await db
+        .select({ id: messages.id })
+        .from(messages)
+        .where(inArray(messages.threadId, ids))
+    ).map((m) => m.id);
+
+    // Ordem ditada pelas FKs.
+    if (msgIds.length > 0) {
+      await db.delete(aiActions).where(inArray(aiActions.messageId, msgIds));
+    }
+    await db.delete(aiActions).where(inArray(aiActions.threadId, ids));
+    await db.delete(messages).where(inArray(messages.threadId, ids));
+    await db.delete(threads).where(inArray(threads.id, ids));
+
+    removidas += ids.length;
+  }
+
+  return {
+    removidas,
+    concluido: (await countCleanup(f)) === 0,
+  };
+}
+
 /** Quanto ainda há para limpar. Usado para mostrar o pendente na tela. */
 export async function retentionPending(): Promise<number> {
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);

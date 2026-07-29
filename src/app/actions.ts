@@ -20,6 +20,7 @@ import { encryptSecret } from "@/lib/crypto";
 import { suggestReplyForMessage, getAiSettings } from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
 import { verifyImap, skipToLatest } from "@/lib/imap";
+import { runCleanup } from "@/lib/retention";
 import { deleteLead, EverinboxError } from "@/lib/everinbox";
 import { isCategory } from "@/lib/ui";
 
@@ -247,6 +248,40 @@ export async function skipBacklogAction(
     const novoUid = await skipToLatest(mb);
     revalidatePath("/caixas");
     return `Ponteiro movido para o UID ${novoUid}. Só e-mails novos daqui em diante.`;
+  } catch (err) {
+    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+/**
+ * Limpeza sob demanda do banco. DESTRUTIVO: apaga respostas, mensagens e
+ * análises da IA que casem com o filtro.
+ *
+ * A idade mínima é obrigatória e nunca menor que 1 dia — sem isso um clique
+ * distraído apagaria o movimento do dia.
+ */
+export async function cleanupThreadsAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  await requireAdmin();
+
+  const diasRaw = Number(formData.get("dias"));
+  const dias = Number.isFinite(diasRaw) && diasRaw >= 1 ? Math.floor(diasRaw) : 7;
+  const filtro = {
+    dias,
+    somenteFechadas: formData.get("somenteFechadas") === "on",
+    semResposta: formData.get("semResposta") === "on",
+  };
+
+  try {
+    const { removidas, concluido } = await runCleanup(filtro);
+    revalidatePath("/caixas");
+    revalidatePath("/tickets");
+    if (removidas === 0) return "Nada a remover com esse filtro.";
+    return concluido
+      ? `${removidas} resposta${removidas === 1 ? "" : "s"} removida${removidas === 1 ? "" : "s"}.`
+      : `${removidas} removidas — ainda há mais, clique de novo para continuar.`;
   } catch (err) {
     return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
   }
