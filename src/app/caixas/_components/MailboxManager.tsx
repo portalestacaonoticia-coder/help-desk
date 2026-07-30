@@ -110,8 +110,26 @@ export default function MailboxManager({
   /** Por que a lista veio vazia, quando veio. */
   projectsError?: string;
 }) {
-  const [editing, setEditing] = useState<MailboxLite | null>(null);
-  const formKey = editing?.id ?? "nova";
+  // Guarda o ID, não o objeto: depois de salvar, o servidor manda a caixa
+  // atualizada em `mailboxes`, e uma cópia presa no estado mostraria os
+  // valores antigos como se nada tivesse sido salvo.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const editing = editingId ? mailboxes.find((m) => m.id === editingId) ?? null : null;
+  const setEditing = (mb: MailboxLite | null) => setEditingId(mb?.id ?? null);
+
+  // A key remonta o form quando os valores persistidos mudam — `defaultValue`
+  // só é lido na montagem. Digitar não mexe nisso: só props novas do servidor.
+  const formKey = editing
+    ? [
+        editing.id,
+        editing.aiPrompt,
+        editing.signature,
+        editing.siteUrl,
+        editing.everinboxProjectIds,
+        editing.operation,
+        editing.label,
+      ].join("|")
+    : "nova";
 
   const selectedProjects = new Set(
     (editing?.everinboxProjectIds ?? "")
@@ -415,31 +433,35 @@ export default function MailboxManager({
               </span>
             </div>
 
-            <div className="form-section">Instruções da IA</div>
+            {/* Fundo próprio: são integrações, não configuração de e-mail. */}
+            <div className="form-block">
+              <div className="form-section">Instruções da IA</div>
 
-            <div className="field">
-              <label htmlFor="aiPrompt">Instruções desta operação</label>
-              <textarea
-                id="aiPrompt"
-                name="aiPrompt"
-                style={{ minHeight: 110 }}
-                placeholder={
-                  "- Responda sempre em espanhol da Espanha.\n" +
-                  "- Trate o cliente por “usted”.\n" +
-                  "- Esta operação divulga cartões, não emite nenhum."
-                }
-                defaultValue={editing?.aiPrompt ?? ""}
-              />
-              <span className="hint">
-                Somadas ao prompt base, valem só para esta caixa. É aqui que
-                entra o idioma: cada operação responde no dela.
-              </span>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="aiPrompt">Instruções desta operação</label>
+                <textarea
+                  id="aiPrompt"
+                  name="aiPrompt"
+                  style={{ minHeight: 110 }}
+                  placeholder={
+                    "- Responda sempre em espanhol da Espanha.\n" +
+                    "- Trate o cliente por “usted”.\n" +
+                    "- Esta operação divulga cartões, não emite nenhum."
+                  }
+                  defaultValue={editing?.aiPrompt ?? ""}
+                />
+                <span className="hint">
+                  Somadas ao prompt base, valem só para esta caixa. É aqui que
+                  entra o idioma: cada operação responde no dela.
+                </span>
+              </div>
             </div>
 
-            <div className="form-section">Everinbox</div>
+            <div className="form-block">
+              <div className="form-section">Everinbox</div>
 
-            <div className="field">
-              <label>Projetos na Everinbox</label>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Projetos na Everinbox</label>
               {projects.length === 0 ? (
                 <>
                   <input
@@ -474,9 +496,10 @@ export default function MailboxManager({
                   </span>
                 </>
               )}
+              </div>
             </div>
 
-            <label className="check" style={{ marginBottom: 14 }}>
+            <label className="check" style={{ margin: "18px 0 14px" }}>
               <input
                 type="checkbox"
                 name="active"

@@ -670,6 +670,19 @@ label {
   border-top: none;
 }
 
+/* Bloco destacado: separa integrações da configuração de e-mail. */
+.form-block {
+  margin: 22px 0 0;
+  padding: 4px 18px 18px;
+  border-radius: 16px;
+  background: hsl(var(--accent) / 0.45);
+  border: 1px solid hsl(var(--border));
+}
+.form-block .form-section {
+  border-top: none;
+  margin-top: 16px;
+}
+
 /* Lista de checkboxes com rolagem — projetos da Everinbox podem ser muitos. */
 .check-list {
   display: flex;
