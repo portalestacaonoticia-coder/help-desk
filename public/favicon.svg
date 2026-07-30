@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Help Desk">
   <!-- Fundo branco: sem ele a aba escura mostra o azul sobre transparente. -->
   <rect width="192" height="192" fill="#fff"/>
-  <circle cx="96" cy="96" r="78" fill="none" stroke="#0B4EA2" stroke-width="4"/>
-  <!-- "H" desenhado como path em vez de <text>: fonte de sistema não é
-       garantida no contexto de favicon, e a forma tem que ser idêntica
-       em qualquer navegador. -->
-  <path fill="#0B4EA2" d="M58 44h26v33h24V44h26v104h-26v-38H84v38H58z"/>
+  <circle cx="96" cy="96" r="78" fill="none" stroke="#0047AB" stroke-width="3"/>
+  <!-- "H" como path, não <text>: fonte de sistema não é garantida no contexto
+       de favicon, e a forma tem que ser idêntica em qualquer navegador.
+       Hastes finas e travessão baixo, seguindo as proporções do original. -->
+  <path fill="#0047AB" d="M55 44h22v42h38V44h22v104h-22v-43H77v43H55z"/>
 </svg>
