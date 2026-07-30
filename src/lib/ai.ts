@@ -18,7 +18,8 @@ import { sendReply } from "@/lib/smtp";
 export const DEFAULT_BASE_PROMPT = `Você é um agente de suporte da Tihee respondendo e-mails de clientes internos.
 
 Regras de resposta:
-- Escreva em português do Brasil, em tom cordial, direto e profissional.
+- Escreva SEMPRE no mesmo idioma do e-mail do cliente, em tom cordial, direto
+  e profissional. Se as instruções da operação fixarem um idioma, use aquele.
 - Responda SOMENTE com base nos artigos da base de conhecimento fornecidos.
 - Se os artigos não cobrirem o problema, não invente solução: diga apenas que
   vai verificar com o time e retornar, e marque "precisa_humano": true.
@@ -217,19 +218,25 @@ function buildSystemPrompt(
       ? `\n\n## Envio automático (esta resposta vai ao cliente SEM revisão humana)\n${settings.autoSendPrompt.trim()}`
       : "";
 
-  // Depois do prompt base e antes do resto: o que é específico da operação
-  // (idioma, tom, produto) precisa prevalecer sobre a regra geral.
+  // Vai no FIM do prompt, não logo após a base. O prompt base costuma trazer
+  // regras absolutas ("escreva em português do Brasil") que contradizem o que
+  // a operação pede; colocado por último e com precedência explícita, o bloco
+  // da operação ganha a disputa em vez de competir com ela.
   const opBlock = operationPrompt?.trim()
-    ? `\n\n## Instruções desta operação (prevalecem sobre as regras acima)\n${operationPrompt.trim()}`
+    ? `\n\n## Instruções desta operação — PRECEDÊNCIA MÁXIMA
+As regras abaixo são desta caixa e SOBREPÕEM qualquer instrução anterior,
+inclusive as do prompt base. Onde houver conflito, vale o que está aqui.
+
+${operationPrompt.trim()}`
     : "";
 
-  return `${base}${opBlock}${autoBlock}
+  return `${base}${autoBlock}
 
 ## Categorias disponíveis
 ${categoryBlock}
 
 ## Base de conhecimento
-${kbBlock}
+${kbBlock}${opBlock}
 
 ## Formato de saída
 Responda APENAS com um objeto json neste formato exato:

@@ -115,7 +115,15 @@ export default function MailboxManager({
   // valores antigos como se nada tivesse sido salvo.
   const [editingId, setEditingId] = useState<number | null>(null);
   const editing = editingId ? mailboxes.find((m) => m.id === editingId) ?? null : null;
-  const setEditing = (mb: MailboxLite | null) => setEditingId(mb?.id ?? null);
+
+  // Fechado por padrão: o formulário é longo e, no dia a dia, esta tela serve
+  // para monitorar as caixas, não para cadastrar. Abre ao editar ou ao clicar
+  // no cabeçalho.
+  const [formOpen, setFormOpen] = useState(false);
+  const setEditing = (mb: MailboxLite | null) => {
+    setEditingId(mb?.id ?? null);
+    setFormOpen(true);
+  };
 
   // A key remonta o form quando os valores persistidos mudam — `defaultValue`
   // só é lido na montagem. Digitar não mexe nisso: só props novas do servidor.
@@ -249,12 +257,21 @@ export default function MailboxManager({
 
       {canEdit && (
         <div className="card pad">
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            {editing
-              ? `Editando ${editing.operation || editing.label}`
-              : "Nova caixa"}
-          </div>
+          <button
+            type="button"
+            className="form-toggle"
+            onClick={() => setFormOpen((v) => !v)}
+            aria-expanded={formOpen}
+          >
+            <span className="card-title">
+              {editing
+                ? `Editando ${editing.operation || editing.label}`
+                : "Nova caixa"}
+            </span>
+            <span className="form-toggle-icon">{formOpen ? "−" : "+"}</span>
+          </button>
 
+          {formOpen && (
           <form key={formKey} action={saveMailboxAction}>
             {editing && <input type="hidden" name="id" value={editing.id} />}
 
@@ -510,6 +527,7 @@ export default function MailboxManager({
 
             <SaveButton editing={Boolean(editing)} />
           </form>
+          )}
         </div>
       )}
     </div>
