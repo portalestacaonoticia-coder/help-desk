@@ -32,7 +32,11 @@ export function StatusForm({
     <form action={action}>
       <input type="hidden" name="threadId" value={threadId} />
       <label htmlFor="status">Status</label>
-      <select id="status" name="status" defaultValue={status}>
+      {/* key remonta o select quando o servidor manda um valor novo:
+          `defaultValue` só é lido na montagem, então sem isso o campo
+          continuaria mostrando o valor antigo depois de salvar. Digitar não
+          remonta nada — só props novas mudam a key. */}
+      <select key={status} id="status" name="status" defaultValue={status}>
         {Object.entries(STATUS_LABELS).map(([v, l]) => (
           <option key={v} value={v}>
             {l}
@@ -64,7 +68,13 @@ export function CategoryForm({
     <form action={action} style={{ marginTop: 14 }}>
       <input type="hidden" name="threadId" value={threadId} />
       <label htmlFor="category">Categoria</label>
-      <select id="category" name="category" defaultValue={category ?? ""}>
+      {/* Mesmo motivo do select de status: remonta ao receber valor novo. */}
+      <select
+        key={category ?? ""}
+        id="category"
+        name="category"
+        defaultValue={category ?? ""}
+      >
         <option value="">Sem categoria</option>
         {CATEGORIES.map((c) => (
           <option key={c} value={c}>
