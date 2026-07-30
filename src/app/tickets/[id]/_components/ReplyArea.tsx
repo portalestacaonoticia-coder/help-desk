@@ -97,9 +97,6 @@ function SuggestionCard({
   signature: string | null;
   onUse: (text: string) => void;
 }) {
-  const confidencePct =
-    suggestion.confidence != null ? Math.round(suggestion.confidence * 100) : null;
-
   // Falha na chamada ao DeepSeek: mostra o erro e oferece nova tentativa.
   if (suggestion.errorMessage) {
     return (
@@ -135,10 +132,6 @@ function SuggestionCard({
           <path d="m12 3-1.9 5.8L4.3 10.7l5.8 1.9L12 18.4l1.9-5.8 5.8-1.9-5.8-1.9z" />
         </svg>
         <span className="label">Sugestão de resposta</span>
-        {confidencePct != null && (
-          <span className="meta">confiança {confidencePct}%</span>
-        )}
-        {suggestion.category && <span className="pill">{suggestion.category}</span>}
       </div>
 
       {suggestion.summary && (
