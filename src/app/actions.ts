@@ -283,7 +283,10 @@ export async function unsubscribeContactAction(
         return "removido" as const;
       } catch (err) {
         if (err instanceof EverinboxError && err.status === 404) {
-          return "ausente" as const;
+          // 404 na PRIMEIRA tentativa: o contato realmente não estava lá.
+          // 404 na SEGUNDA, depois de um timeout: quem tirou fomos nós — a
+          // primeira chamada executou, só não confirmou a tempo.
+          return tentativa === 1 ? ("ausente" as const) : ("removido" as const);
         }
         if (err instanceof EverinboxError && err.timedOut && tentativa === 1) {
           continue; // segunda e última tentativa
@@ -557,6 +560,7 @@ export async function saveMailboxAction(formData: FormData) {
   const fromAddress = String(formData.get("fromAddress") ?? "").trim() || imapUser;
   const signature = String(formData.get("signature") ?? "").trim() || null;
   const siteUrl = String(formData.get("siteUrl") ?? "").trim() || null;
+  const aiPrompt = String(formData.get("aiPrompt") ?? "").trim() || null;
   // Seleção múltipla: o form manda um `everinboxProjectIds` por projeto marcado.
   const everinboxProjectIds =
     formData
@@ -589,6 +593,7 @@ export async function saveMailboxAction(formData: FormData) {
     fromAddress,
     signature,
     siteUrl,
+    aiPrompt,
     everinboxProjectIds,
     active,
   };

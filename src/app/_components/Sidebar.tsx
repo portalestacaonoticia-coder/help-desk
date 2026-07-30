@@ -59,7 +59,6 @@ export type OperationNav = {
 
 export default function Sidebar({
   openCount,
-  todayCount,
   operations,
   activeMailbox,
   agentName,
@@ -67,7 +66,6 @@ export default function Sidebar({
   agentRole,
 }: {
   openCount: number;
-  todayCount: number;
   operations: OperationNav[];
   activeMailbox: string | null;
   agentName: string;
@@ -142,27 +140,6 @@ export default function Sidebar({
       </nav>
 
       <div className="sidebar-foot">
-        <div className="stat-card">
-          <div className="head">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span>Total de respostas</span>
-          </div>
-          <div className="num">{todayCount}</div>
-          <div className="sub">recebidas hoje</div>
-        </div>
-
         <div className="agent">
           <div className="avatar lg">{agentInitials}</div>
           <div className="agent-name">

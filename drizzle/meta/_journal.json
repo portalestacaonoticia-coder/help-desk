@@ -57,6 +57,13 @@
       "when": 1786100000000,
       "tag": "0007_everinbox_multiprojeto",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786200000000,
+      "tag": "0008_prompt_por_caixa",
+      "breakpoints": true
     }
   ]
 }

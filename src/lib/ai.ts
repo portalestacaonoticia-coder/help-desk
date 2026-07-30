@@ -189,6 +189,8 @@ function buildSystemPrompt(
   articles: KbArticle[],
   /** Só true quando ESTA geração pode terminar em envio sem revisão. */
   podeEnviarSozinha: boolean,
+  /** Instruções da caixa: idioma e particularidades daquela operação. */
+  operationPrompt: string | null,
 ): string {
   const base = settings.basePrompt.trim() || DEFAULT_BASE_PROMPT;
 
@@ -215,7 +217,13 @@ function buildSystemPrompt(
       ? `\n\n## Envio automático (esta resposta vai ao cliente SEM revisão humana)\n${settings.autoSendPrompt.trim()}`
       : "";
 
-  return `${base}${autoBlock}
+  // Depois do prompt base e antes do resto: o que é específico da operação
+  // (idioma, tom, produto) precisa prevalecer sobre a regra geral.
+  const opBlock = operationPrompt?.trim()
+    ? `\n\n## Instruções desta operação (prevalecem sobre as regras acima)\n${operationPrompt.trim()}`
+    : "";
+
+  return `${base}${opBlock}${autoBlock}
 
 ## Categorias disponíveis
 ${categoryBlock}
@@ -363,7 +371,20 @@ export async function suggestReplyForMessage(
   // A trava mestra sozinha não basta: o rascunho manual nunca envia.
   const podeEnviarSozinha = permitirEnvio && settings.autoSendEnabled;
 
-  const system = buildSystemPrompt(settings, cats, relevant, podeEnviarSozinha);
+  // Caixa da mensagem: dá o idioma e a assinatura da operação.
+  const [mb] = await db
+    .select({ aiPrompt: mailboxes.aiPrompt, signature: mailboxes.signature })
+    .from(mailboxes)
+    .where(eq(mailboxes.id, msg.mailboxId))
+    .limit(1);
+
+  const system = buildSystemPrompt(
+    settings,
+    cats,
+    relevant,
+    podeEnviarSozinha,
+    mb?.aiPrompt ?? null,
+  );
   const user = buildUserPrompt(thread?.subject ?? msg.subject, history);
 
   try {
@@ -402,11 +423,6 @@ export async function suggestReplyForMessage(
 
     if (podeAutoEnviar) {
       try {
-        const [mb] = await db
-          .select({ signature: mailboxes.signature })
-          .from(mailboxes)
-          .where(eq(mailboxes.id, msg.mailboxId))
-          .limit(1);
         const assinatura = mb?.signature?.trim();
 
         await sendReply({

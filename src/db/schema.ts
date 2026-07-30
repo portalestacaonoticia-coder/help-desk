@@ -44,6 +44,11 @@ export const mailboxes = pgTable("mailboxes", {
   // Site da operação. A IA lê o sitemap dele para responder com base nos posts.
   siteUrl: text("site_url"),
 
+  // Instruções da IA específicas desta caixa, somadas ao prompt base. É aqui
+  // que mora o idioma: uma caixa em espanhol precisa de regras em espanhol,
+  // e isso não cabe num prompt único para todas as operações.
+  aiPrompt: text("ai_prompt"),
+
   // Projetos da operação na Everinbox, ids separados por vírgula. Uma caixa
   // pode atender vários projetos, e o descadastramento remove o contato de
   // todos. Vazio = botão de cancelar inscrição some do chamado.

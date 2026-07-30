@@ -23,6 +23,7 @@ export type MailboxLite = {
   fromAddress: string | null;
   signature: string | null;
   siteUrl: string | null;
+  aiPrompt: string | null;
   /** Ids separados por vírgula. */
   everinboxProjectIds: string | null;
   active: boolean;
@@ -411,6 +412,27 @@ export default function MailboxManager({
               <span className="hint">
                 Anexada às respostas desta caixa. Cada operação assina com o
                 nome dela.
+              </span>
+            </div>
+
+            <div className="form-section">Instruções da IA</div>
+
+            <div className="field">
+              <label htmlFor="aiPrompt">Instruções desta operação</label>
+              <textarea
+                id="aiPrompt"
+                name="aiPrompt"
+                style={{ minHeight: 110 }}
+                placeholder={
+                  "- Responda sempre em espanhol da Espanha.\n" +
+                  "- Trate o cliente por “usted”.\n" +
+                  "- Esta operação divulga cartões, não emite nenhum."
+                }
+                defaultValue={editing?.aiPrompt ?? ""}
+              />
+              <span className="hint">
+                Somadas ao prompt base, valem só para esta caixa. É aqui que
+                entra o idioma: cada operação responde no dela.
               </span>
             </div>
 

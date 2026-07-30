@@ -25,18 +25,6 @@ export default async function AppShell({
     .from(threads)
     .where(eq(threads.status, "aberto"));
 
-  // Respostas recebidas hoje, pela data do E-MAIL (sent_at) e não pela hora em
-  // que o cron leu: com a ingestão atrasada, contar created_at mede o cron, não
-  // o movimento do dia. O corte é a meia-noite de São Paulo — em UTC o "dia"
-  // viraria às 21h.
-  const [{ n: todayCount }] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(messages)
-    .where(
-      sql`${messages.direction} = 'inbound'
-          and ${messages.sentAt} >= (date_trunc('day', now() at time zone 'America/Sao_Paulo')) at time zone 'America/Sao_Paulo'`,
-    );
-
   // Uma entrada de menu por operação (caixa ativa), com sua fila em aberto.
   //
   // Correlação por leftJoin, não por subquery em template `sql`: dentro do
@@ -62,7 +50,6 @@ export default async function AppShell({
     <div className="shell">
       <Sidebar
         openCount={openCount}
-        todayCount={todayCount}
         operations={operations}
         activeMailbox={mailbox ?? null}
         agentName={name}
