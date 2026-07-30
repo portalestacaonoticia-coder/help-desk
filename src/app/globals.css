@@ -670,6 +670,133 @@ label {
   border-top: none;
 }
 
+/* ---------------------------------------------------------- */
+/* Dashboard                                                   */
+/* ---------------------------------------------------------- */
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: hsl(var(--accent));
+  border: 1px solid hsl(var(--border));
+}
+.segmented a {
+  padding: 7px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+.segmented a.active {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: var(--shadow-card);
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+.kpi-num {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.kpi-sub {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.kpi-delta {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.kpi-delta.bom {
+  color: hsl(145 65% 32%);
+}
+.kpi-delta.ruim {
+  color: hsl(0 65% 45%);
+}
+.kpi-delta.neutro {
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+}
+
+.chart-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+}
+@media (max-width: 1100px) {
+  .chart-wrap {
+    grid-template-columns: 1fr;
+  }
+}
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chart-tooltip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: center;
+  min-height: 34px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.chart-tooltip i,
+.serie-item i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.serie-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.serie-item span {
+  flex: 1;
+  min-width: 0;
+}
+.serie-item strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Conta · entrada · % · respondidos · % · tempo · cancel · % */
+.trow.dash-row {
+  grid-template-columns: minmax(0, 1.6fr) repeat(7, minmax(0, 1fr));
+  font-variant-numeric: tabular-nums;
+}
+.trow.dash-row.total {
+  background: hsl(220 30% 98%);
+  font-weight: 600;
+}
+
 /* Cabeçalho clicável do formulário colapsável de caixa. */
 .form-toggle {
   display: flex;

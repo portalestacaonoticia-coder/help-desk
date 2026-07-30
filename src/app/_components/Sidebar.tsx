@@ -16,6 +16,9 @@ const ICONS = {
   mailboxes: (
     <path d="M2 4h20v16H2zM2 7l10 6 10-6" />
   ),
+  dashboard: (
+    <path d="M3 3v18h18M7 15l4-4 3 3 5-6" />
+  ),
 } as const;
 
 function NavItem({
@@ -87,6 +90,14 @@ export default function Sidebar({
       </div>
 
       <nav className="nav">
+        <div className="nav-section">Visão geral</div>
+        <NavItem
+          href="/dashboard"
+          icon="dashboard"
+          label="Dashboard"
+          active={pathname.startsWith("/dashboard")}
+        />
+
         <div className="nav-section">
           {operations.length === 1 ? "Operação" : "Operações"}
         </div>
