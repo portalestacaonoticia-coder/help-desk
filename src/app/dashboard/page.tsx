@@ -71,12 +71,6 @@ export default async function DashboardPage({
   return (
     <AppShell mailbox={sp.conta}>
       <section className="page">
-        <div className="page-head">
-          <div>
-            <h1>Dashboard</h1>
-          </div>
-        </div>
-
         {/* ---- 1. Filtros globais ---- */}
         <div className="filters">
           <div>
