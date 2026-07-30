@@ -516,7 +516,7 @@ export default function MailboxManager({
               </div>
             </div>
 
-            <label className="check" style={{ margin: "18px 0 14px" }}>
+            <label className="check" style={{ margin: "18px 0 0" }}>
               <input
                 type="checkbox"
                 name="active"
@@ -524,6 +524,17 @@ export default function MailboxManager({
               />
               <span>Caixa ativa na ingestão</span>
             </label>
+
+            {/* Só no cadastro: em edição o ponteiro já existe e mexer nele
+                aqui apagaria o progresso da ingestão sem aviso. */}
+            {!editing && (
+              <label className="check" style={{ marginBottom: 14 }}>
+                <input type="checkbox" name="skipBacklog" defaultChecked />
+                <span>
+                  Importar só e-mails novos, ignorando o histórico da caixa
+                </span>
+              </label>
+            )}
 
             <SaveButton editing={Boolean(editing)} />
           </form>

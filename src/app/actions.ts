@@ -610,11 +610,27 @@ export async function saveMailboxAction(formData: FormData) {
       .where(eq(mailboxes.id, Number(rawId)));
   } else {
     if (!imapPass) throw new Error("Senha IMAP é obrigatória para cadastrar a caixa");
-    await db.insert(mailboxes).values({
-      ...common,
-      imapPassEnc: encryptSecret(imapPass),
-      smtpPassEnc: encryptSecret(smtpPass || imapPass),
-    });
+    const [criada] = await db
+      .insert(mailboxes)
+      .values({
+        ...common,
+        imapPassEnc: encryptSecret(imapPass),
+        smtpPassEnc: encryptSecret(smtpPass || imapPass),
+      })
+      .returning();
+
+    // Caixa nova nasce com last_uid = 0, o que faria a ingestão varrer a INBOX
+    // inteira desde o e-mail mais antigo. Quase nunca é o que se quer: o
+    // padrão é começar do presente.
+    // Checkbox desmarcado não é enviado, então o teste é por "on".
+    if (formData.get("skipBacklog") === "on" && criada) {
+      try {
+        await skipToLatest(criada);
+      } catch {
+        // Best-effort: se o IMAP não responder agora, a caixa fica cadastrada
+        // e o botão "Pular backlog" resolve depois.
+      }
+    }
   }
 
   revalidatePath("/caixas");
