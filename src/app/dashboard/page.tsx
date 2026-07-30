@@ -74,9 +74,6 @@ export default async function DashboardPage({
         <div className="page-head">
           <div>
             <h1>Dashboard</h1>
-            <p className="page-sub">
-              Desempenho da operação por {PERIODO_LABEL[periodo].toLowerCase()}.
-            </p>
           </div>
         </div>
 
