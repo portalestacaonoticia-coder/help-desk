@@ -26,6 +26,17 @@ import { isCategory, STATUS_LABELS } from "@/lib/ui";
 
 const VALID_STATUS = ["aberto", "fechado"] as const;
 
+/**
+ * Revalida o layout inteiro, não só a rota atual.
+ *
+ * Os contadores da sidebar (fila por operação, recebidas hoje) são calculados
+ * no AppShell, que roda em TODAS as telas. Revalidar só `/tickets` deixava o
+ * número velho ao fechar um chamado a partir da tela dele ou de outra página.
+ */
+function revalidateShell() {
+  revalidatePath("/", "layout");
+}
+
 /** Login com credenciais. Retorna mensagem de erro ou redireciona. */
 export async function loginAction(
   _prev: string | undefined,
@@ -104,7 +115,7 @@ export async function replyAction(formData: FormData) {
   }
 
   revalidatePath(`/tickets/${threadId}`);
-  revalidatePath("/tickets");
+  revalidateShell();
 }
 
 /**
@@ -132,7 +143,7 @@ export async function setStatusAction(
   }
 
   revalidatePath(`/tickets/${threadId}`);
-  revalidatePath("/tickets");
+  revalidateShell();
   return `Status alterado para ${STATUS_LABELS[status] ?? status}.`;
 }
 
@@ -160,7 +171,7 @@ export async function setCategoryAction(
   }
 
   revalidatePath(`/tickets/${threadId}`);
-  revalidatePath("/tickets");
+  revalidateShell();
   return category ? `Categoria: ${category}.` : "Categoria removida.";
 }
 
@@ -185,7 +196,7 @@ export async function bulkSetStatusAction(formData: FormData) {
   if (ids.length === 0) return;
 
   await db.update(threads).set({ status }).where(inArray(threads.id, ids));
-  revalidatePath("/tickets");
+  revalidateShell();
 }
 
 /**
@@ -218,7 +229,7 @@ export async function deleteThreadsAction(formData: FormData) {
   await db.delete(messages).where(inArray(messages.threadId, ids));
   await db.delete(threads).where(inArray(threads.id, ids));
 
-  revalidatePath("/tickets");
+  revalidateShell();
 }
 
 /**
@@ -367,8 +378,7 @@ export async function cleanupThreadsAction(
 
   try {
     const { removidas, concluido } = await runCleanup(filtro);
-    revalidatePath("/caixas");
-    revalidatePath("/tickets");
+    revalidateShell();
     if (removidas === 0) return "Nada a remover com esse filtro.";
     return concluido
       ? `${removidas} resposta${removidas === 1 ? "" : "s"} removida${removidas === 1 ? "" : "s"}.`
