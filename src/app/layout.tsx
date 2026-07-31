@@ -4,7 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Help Desk — Tihee",
   description: "Central de suporte por e-mail",
-  icons: { icon: "/favicon.svg" },
+  // Sem `icons` aqui de propósito: o arquivo `src/app/icon.svg` é convenção do
+  // Next, que gera o <link> com um hash do conteúdo na URL. É isso que faz o
+  // navegador buscar o ícone novo — apontar para /favicon.svg fixo deixava o
+  // cache do favicon servir a versão antiga indefinidamente.
 };
 
 export default function RootLayout({
