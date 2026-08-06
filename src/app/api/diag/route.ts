@@ -33,6 +33,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
   categories: ["description", "active"],
   knowledge_base: ["keywords", "active", "updated_at"],
   ai_actions: ["thread_id", "summary", "source_article_ids", "model", "status"],
+  macros: ["mailbox_id"],
 };
 
 export async function GET(request: Request) {
