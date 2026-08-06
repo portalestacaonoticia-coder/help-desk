@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import { threads, mailboxes, messages, macros } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
@@ -54,6 +54,8 @@ export default async function TicketPage({
     .where(eq(messages.threadId, threadId))
     .orderBy(asc(messages.createdAt));
 
+  // Só as respostas prontas desta caixa — mais as sem caixa, legado de antes
+  // da segmentação, que valem para todas.
   const macroList = await db
     .select({
       id: macros.id,
@@ -62,6 +64,7 @@ export default async function TicketPage({
       shortcut: macros.shortcut,
     })
     .from(macros)
+    .where(or(eq(macros.mailboxId, thread.mailboxId), isNull(macros.mailboxId)))
     .orderBy(macros.title);
 
   // Rascunho da IA pendente para esta conversa, se houver. Tudo aqui é

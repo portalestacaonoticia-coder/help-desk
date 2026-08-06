@@ -143,14 +143,21 @@ export const messages = pgTable("messages", {
 
 /**
  * Respostas prontas / macros usadas pelos agentes.
+ *
+ * Cada resposta pertence a uma caixa: o texto de uma marca não serve para
+ * outra. O formulário exige a caixa, mas a coluna é nullable por causa do
+ * legado — resposta sem caixa vale para todas (ver src/app/macros/page.tsx).
  */
 export const macros = pgTable("macros", {
   id: serial("id").primaryKey(),
+  mailboxId: integer("mailbox_id").references(() => mailboxes.id),
   title: text("title").notNull(),
   body: text("body").notNull(),
   shortcut: text("shortcut"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index("macros_mailbox_idx").on(t.mailboxId),
+]);
 
 /**
  * Log de cada execução do cron de ingestão, por caixa.

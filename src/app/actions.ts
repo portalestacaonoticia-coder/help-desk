@@ -398,16 +398,22 @@ export async function saveMacroAction(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const shortcut = String(formData.get("shortcut") ?? "").trim() || null;
+  const mailboxId = Number(String(formData.get("mailboxId") ?? "").trim());
 
   if (!title || !body) throw new Error("Título e corpo são obrigatórios");
+  // Caixa é obrigatória: resposta sem caixa aparece em todas as operações, e
+  // o texto de uma marca não serve para outra.
+  if (!Number.isInteger(mailboxId) || mailboxId <= 0) {
+    throw new Error("Selecione a caixa de entrada da resposta");
+  }
 
   if (rawId) {
     await db
       .update(macros)
-      .set({ title, body, shortcut })
+      .set({ mailboxId, title, body, shortcut })
       .where(eq(macros.id, Number(rawId)));
   } else {
-    await db.insert(macros).values({ title, body, shortcut });
+    await db.insert(macros).values({ mailboxId, title, body, shortcut });
   }
   revalidatePath("/macros");
 }

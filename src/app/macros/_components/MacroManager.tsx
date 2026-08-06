@@ -9,7 +9,11 @@ export type MacroLite = {
   title: string;
   body: string;
   shortcut: string | null;
+  mailboxId: number | null;
+  mailboxName: string | null;
 };
+
+export type MailboxOption = { id: number; nome: string };
 
 function SaveButton({ editing }: { editing: boolean }) {
   const { pending } = useFormStatus();
@@ -25,7 +29,15 @@ function SaveButton({ editing }: { editing: boolean }) {
   );
 }
 
-export default function MacroManager({ macros }: { macros: MacroLite[] }) {
+export default function MacroManager({
+  macros,
+  mailboxes,
+  defaultMailboxId,
+}: {
+  macros: MacroLite[];
+  mailboxes: MailboxOption[];
+  defaultMailboxId: number | null;
+}) {
   const [editing, setEditing] = useState<MacroLite | null>(null);
   // Trocar a key remonta o form, para os defaultValue acompanharem a seleção.
   const formKey = editing?.id ?? "nova";
@@ -44,6 +56,10 @@ export default function MacroManager({ macros }: { macros: MacroLite[] }) {
               <div className="head">
                 <strong>{m.title}</strong>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {/* Sem caixa = legado, que segue valendo para todas. */}
+                  <span className="pill">
+                    {m.mailboxName ?? "Todas as caixas"}
+                  </span>
                   {m.shortcut && <span className="pill mono">{m.shortcut}</span>}
                   <button type="button" onClick={() => setEditing(m)}>
                     Editar
@@ -64,6 +80,27 @@ export default function MacroManager({ macros }: { macros: MacroLite[] }) {
         <form key={formKey} action={saveMacroAction}>
           {editing && <input type="hidden" name="id" value={editing.id} />}
 
+          <div className="field">
+            <label htmlFor="mailboxId">Caixa de entrada</label>
+            <select
+              id="mailboxId"
+              name="mailboxId"
+              required
+              defaultValue={
+                editing?.mailboxId ?? defaultMailboxId ?? ""
+              }
+            >
+              <option value="">Selecione a caixa</option>
+              {mailboxes.map((mb) => (
+                <option key={mb.id} value={mb.id}>
+                  {mb.nome}
+                </option>
+              ))}
+            </select>
+            <span className="hint">
+              A resposta só aparece no atendimento dessa caixa.
+            </span>
+          </div>
           <div className="field">
             <label htmlFor="title">Título</label>
             <input
