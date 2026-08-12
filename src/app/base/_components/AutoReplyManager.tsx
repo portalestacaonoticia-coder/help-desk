@@ -52,9 +52,13 @@ export default function AutoReplyManager({
   // Trocar a key remonta o form, para os defaultValue acompanharem a seleção.
   const formKey = editing?.id ?? "nova";
 
+  // Estes cards vivem DENTRO do card de configurações. Sem tirar a sombra,
+  // ficariam com a mesma elevação do painel que os contém.
+  const inner = { boxShadow: "none", borderRadius: 14 } as const;
+
   return (
     <div className="macro-grid">
-      <div className="card">
+      <div className="card" style={inner}>
         {replies.length === 0 ? (
           <div className="empty">
             Nenhuma resposta automática cadastrada. Sem texto padrão, a IA
@@ -101,7 +105,7 @@ export default function AutoReplyManager({
         )}
       </div>
 
-      <div className="card props">
+      <div className="card props" style={inner}>
         <span className="card-title">
           {editing
             ? `Editando ${languageLabel(editing.language)} — ${editing.mailboxName}`

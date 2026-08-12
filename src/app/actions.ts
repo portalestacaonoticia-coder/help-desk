@@ -465,6 +465,16 @@ export async function saveAiSettingsAction(formData: FormData) {
   await requireAdmin();
   await getAiSettings(); // garante que a linha singleton existe
 
+  // Os campos desta tela ficam FORA do <form> e se ligam a ele pelo atributo
+  // `form` (ver src/app/base/page.tsx). Se essa associação falhar, o submit
+  // chega vazio — e "vazio" aqui significaria apagar os dois prompts. Um
+  // textarea existente pode estar em branco, mas ausente ele nunca está.
+  if (!formData.has("basePrompt") || !formData.has("autoSendPrompt")) {
+    throw new Error(
+      "Formulário incompleto — recarregue a página e salve de novo.",
+    );
+  }
+
   const basePrompt = String(formData.get("basePrompt") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim() || "deepseek-v4-flash";
   const enabled = formData.get("enabled") === "on";
