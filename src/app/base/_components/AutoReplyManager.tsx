@@ -19,12 +19,7 @@ export type MailboxOption = { id: number; nome: string };
 function SaveButton({ editing }: { editing: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      className="primary"
-      disabled={pending}
-      style={{ width: "100%" }}
-    >
+    <button type="submit" className="primary" disabled={pending}>
       {pending ? "Salvando…" : editing ? "Salvar alterações" : "Adicionar resposta"}
     </button>
   );
@@ -32,6 +27,9 @@ function SaveButton({ editing }: { editing: boolean }) {
 
 /**
  * Lista e formulário das respostas automáticas: um texto por caixa e idioma.
+ *
+ * Coluna única — lista em cima, formulário embaixo, ambos na largura do card.
+ * Duas colunas espremiam o texto da resposta, que é o campo que importa.
  *
  * Fica fora do formulário de configuração da IA de propósito — aquele salva a
  * linha única de ai_settings, este mexe em uma tabela com várias linhas, e
@@ -57,7 +55,7 @@ export default function AutoReplyManager({
   const inner = { boxShadow: "none", borderRadius: 14 } as const;
 
   return (
-    <div className="macro-grid">
+    <div>
       <div className="card" style={inner}>
         {replies.length === 0 ? (
           <div className="empty">
@@ -105,7 +103,7 @@ export default function AutoReplyManager({
         )}
       </div>
 
-      <div className="card props" style={inner}>
+      <div className="card props" style={{ ...inner, marginTop: 16 }}>
         <span className="card-title">
           {editing
             ? `Editando ${languageLabel(editing.language)} — ${editing.mailboxName}`
@@ -185,26 +183,36 @@ export default function AutoReplyManager({
             <span>Ativa</span>
           </label>
 
-          {isAdmin ? (
-            <SaveButton editing={Boolean(editing)} />
-          ) : (
-            <p className="hint">
-              Só administradores podem alterar as respostas automáticas.
-            </p>
-          )}
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginTop: 14,
+            }}
+          >
+            {isAdmin ? (
+              <>
+                <SaveButton editing={Boolean(editing)} />
+                {editing && (
+                  <button type="button" onClick={() => setEditing(null)}>
+                    Cancelar edição
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="hint" style={{ marginTop: 0 }}>
+                Só administradores podem alterar as respostas automáticas.
+              </p>
+            )}
+            {message && (
+              <span className="hint" style={{ marginTop: 0 }}>
+                {message}
+              </span>
+            )}
+          </div>
         </form>
-
-        {message && (
-          <p className="hint" style={{ marginTop: 0 }}>
-            {message}
-          </p>
-        )}
-
-        {editing && (
-          <button type="button" onClick={() => setEditing(null)} style={{ width: "100%" }}>
-            Cancelar edição
-          </button>
-        )}
       </div>
     </div>
   );
