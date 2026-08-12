@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
-import { saveMacroAction } from "@/app/actions";
+import { deleteMacroAction, saveMacroAction } from "@/app/actions";
 
 export type MacroLite = {
   id: number;
@@ -56,14 +56,31 @@ export default function MacroManager({
               <div className="head">
                 <strong>{m.title}</strong>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {/* Sem caixa = legado, que segue valendo para todas. */}
-                  <span className="pill">
-                    {m.mailboxName ?? "Todas as caixas"}
-                  </span>
+                  {/* Sem caixa = legado, que não aparece no atendimento. */}
+                  <span className="pill">{m.mailboxName ?? "Sem caixa"}</span>
                   {m.shortcut && <span className="pill mono">{m.shortcut}</span>}
                   <button type="button" onClick={() => setEditing(m)}>
                     Editar
                   </button>
+                  <form
+                    action={deleteMacroAction}
+                    onSubmit={(e) => {
+                      if (
+                        !confirm(
+                          `Remover a resposta "${m.title}"?\n\nNão dá para desfazer.`,
+                        )
+                      ) {
+                        e.preventDefault();
+                        return;
+                      }
+                      // O form de edição some junto, senão fica apontando
+                      // para um registro que não existe mais.
+                      if (editing?.id === m.id) setEditing(null);
+                    }}
+                  >
+                    <input type="hidden" name="id" value={m.id} />
+                    <button type="submit">Remover</button>
+                  </form>
                 </span>
               </div>
               <div className="body">{m.body}</div>

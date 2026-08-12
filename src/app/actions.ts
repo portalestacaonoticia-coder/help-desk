@@ -419,6 +419,16 @@ export async function saveMacroAction(formData: FormData) {
   revalidatePath("/macros");
 }
 
+/** Remove uma resposta pronta. Sem desfazer. */
+export async function deleteMacroAction(formData: FormData) {
+  await requireUser();
+  const id = Number(formData.get("id"));
+  if (!Number.isInteger(id) || id <= 0) return;
+
+  await db.delete(macros).where(eq(macros.id, id));
+  revalidatePath("/macros");
+}
+
 /* ------------------------------------------------------------------ */
 /* Base de conhecimento e configuração da IA                           */
 /* ------------------------------------------------------------------ */

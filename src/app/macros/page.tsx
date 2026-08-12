@@ -1,4 +1,4 @@
-import { asc, eq, isNull, or, sql } from "drizzle-orm";
+import { asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { macros, mailboxes } from "@/db/schema";
 import AppShell from "@/app/_components/AppShell";
@@ -11,6 +11,9 @@ type SP = { caixa?: string };
 /** Nome de exibição da caixa: operação quando existe, senão o rótulo. */
 const MAILBOX_NAME = sql<string>`coalesce(nullif(${mailboxes.operation}, ''), ${mailboxes.label})`;
 
+/** Valor do filtro que isola as respostas legadas, sem caixa atribuída. */
+const SEM_CAIXA = "sem-caixa";
+
 export default async function MacrosPage({
   searchParams,
 }: {
@@ -19,14 +22,23 @@ export default async function MacrosPage({
   const sp = await searchParams;
   const rawCaixa = Number(sp.caixa);
   const caixaId = Number.isInteger(rawCaixa) && rawCaixa > 0 ? rawCaixa : null;
+  const soSemCaixa = sp.caixa === SEM_CAIXA;
 
   const mbList = await db
     .select({ id: mailboxes.id, nome: MAILBOX_NAME })
     .from(mailboxes)
     .orderBy(asc(mailboxes.label));
 
-  // Filtrar por uma caixa também traz as respostas sem caixa: elas são o
-  // legado de antes da segmentação e valem para todas as operações.
+  // Respostas legadas, de antes da segmentação: ficaram sem caixa e por isso
+  // não aparecem mais no atendimento. Contadas para avisar quem precisa
+  // resolver — atribuindo uma caixa ou removendo.
+  const [{ n: semCaixa }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(macros)
+    .where(isNull(macros.mailboxId));
+
+  // Filtro estrito: cada resposta pertence a uma caixa só, e o texto de uma
+  // marca não serve para outra.
   const list = await db
     .select({
       id: macros.id,
@@ -40,8 +52,10 @@ export default async function MacrosPage({
     .leftJoin(mailboxes, eq(mailboxes.id, macros.mailboxId))
     .where(
       caixaId
-        ? or(eq(macros.mailboxId, caixaId), isNull(macros.mailboxId))
-        : undefined,
+        ? eq(macros.mailboxId, caixaId)
+        : soSemCaixa
+          ? isNull(macros.mailboxId)
+          : undefined,
     )
     .orderBy(sql`${MAILBOX_NAME} asc nulls first`, asc(macros.title));
 
@@ -59,10 +73,19 @@ export default async function MacrosPage({
               {list.length} resposta{list.length === 1 ? "" : "s"} pronta
               {list.length === 1 ? "" : "s"} disponíve
               {list.length === 1 ? "l" : "is"} para o time no atendimento
-              {caixaAtual ? ` em ${caixaAtual}` : ""}.
+              {caixaAtual ? ` em ${caixaAtual}` : ""}
+              {soSemCaixa ? " — sem caixa atribuída" : ""}.
             </p>
           </div>
         </div>
+
+        {semCaixa > 0 && (
+          <div className="callout warn">
+            {semCaixa} resposta{semCaixa === 1 ? "" : "s"} sem caixa de entrada.
+            {semCaixa === 1 ? " Ela não aparece" : " Elas não aparecem"} no
+            atendimento — edite para atribuir uma caixa, ou remova.
+          </div>
+        )}
 
         <form className="filters" method="get">
           <div>
@@ -74,6 +97,12 @@ export default async function MacrosPage({
                   {m.nome}
                 </option>
               ))}
+              {/* Só faz sentido oferecer o filtro quando há o que resolver —
+                  mas mantido enquanto ele estiver ligado, senão o select
+                  mostra "Todas as caixas" sobre uma lista filtrada. */}
+              {(semCaixa > 0 || soSemCaixa) && (
+                <option value={SEM_CAIXA}>Sem caixa</option>
+              )}
             </select>
           </div>
           <div>
