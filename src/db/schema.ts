@@ -236,6 +236,35 @@ export const aiSettings = pgTable("ai_settings", {
 });
 
 /**
+ * Resposta automática: o texto padrão que a IA usa para responder, por caixa
+ * e por idioma.
+ *
+ * Existe porque o prompt do envio automático é um só, geral para todas as
+ * caixas, e o texto que vai ao cliente não é: cada operação tem o seu, e a
+ * mesma operação atende em português, espanhol e inglês. O prompt continua
+ * sendo o guia de conduta; aqui fica o conteúdo.
+ *
+ * Uma linha por (caixa, idioma) — ver o índice único. Salvar de novo o mesmo
+ * par substitui o texto em vez de duplicar.
+ */
+export const autoReplies = pgTable("auto_replies", {
+  id: serial("id").primaryKey(),
+  mailboxId: integer("mailbox_id")
+    .notNull()
+    .references(() => mailboxes.id, { onDelete: "cascade" }),
+  // Código do idioma: pt | es | en (ver LANGUAGES em src/lib/ui.ts).
+  language: text("language").notNull(),
+  body: text("body").notNull(),
+  // Desligar sem apagar: o texto some do prompt e continua guardado.
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("auto_replies_mailbox_idx").on(t.mailboxId),
+  uniqueIndex("auto_replies_mailbox_lang_uq").on(t.mailboxId, t.language),
+]);
+
+/**
  * Uma linha por vez que a IA analisou uma mensagem recebida.
  * Serve de rascunho para o agente e de trilha de auditoria do que o modelo
  * sugeriu, com o que foi feito depois.
@@ -282,4 +311,5 @@ export type Macro = typeof macros.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type KbArticle = typeof knowledgeBase.$inferSelect;
 export type AiSettings = typeof aiSettings.$inferSelect;
+export type AutoReply = typeof autoReplies.$inferSelect;
 export type AiAction = typeof aiActions.$inferSelect;

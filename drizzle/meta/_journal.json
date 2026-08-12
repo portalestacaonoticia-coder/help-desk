@@ -71,6 +71,13 @@
       "when": 1786300000000,
       "tag": "0009_respostas_por_caixa",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786400000000,
+      "tag": "0010_respostas_automaticas",
+      "breakpoints": true
     }
   ]
 }

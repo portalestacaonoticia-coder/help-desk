@@ -1,8 +1,9 @@
-import { and, eq, desc, asc, isNull, inArray } from "drizzle-orm";
+import { and, eq, desc, asc, isNull, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   aiActions,
   aiSettings,
+  autoReplies,
   categories,
   knowledgeBase,
   mailboxes,
@@ -13,6 +14,7 @@ import {
 } from "@/db/schema";
 import { chatJson, DeepSeekError, isAiConfigured, DEFAULT_MODEL } from "@/lib/deepseek";
 import { sendReply } from "@/lib/smtp";
+import { languageName } from "@/lib/ui";
 
 /** Prompt base usado enquanto a equipe não escrever o seu na tela da KB. */
 export const DEFAULT_BASE_PROMPT = `Você é um agente de suporte da Tihee respondendo e-mails de clientes internos.
@@ -119,6 +121,51 @@ export async function getAiSettings(): Promise<AiSettings> {
   return row;
 }
 
+/**
+ * Textos padrão ativos de uma caixa, um por idioma.
+ *
+ * Devolve lista vazia (em vez de lançar) quando a migration ainda não rodou:
+ * sem os textos a IA redige do zero, que é o comportamento de antes — a falta
+ * da tabela não pode derrubar a geração do rascunho.
+ */
+export async function getAutoReplies(mailboxId: number): Promise<AutoReplyLite[]> {
+  try {
+    return await db
+      .select({ language: autoReplies.language, body: autoReplies.body })
+      .from(autoReplies)
+      .where(and(eq(autoReplies.mailboxId, mailboxId), eq(autoReplies.active, true)))
+      .orderBy(asc(autoReplies.language));
+  } catch (err) {
+    if (isMissingRelation(err)) return [];
+    throw err;
+  }
+}
+
+/**
+ * Todas as respostas automáticas, com o nome da caixa, para a tela da base.
+ * Também devolve [] quando a migration ainda não rodou.
+ */
+export async function listAutoReplies() {
+  const nome = sql<string>`coalesce(nullif(${mailboxes.operation}, ''), ${mailboxes.label})`;
+  try {
+    return await db
+      .select({
+        id: autoReplies.id,
+        mailboxId: autoReplies.mailboxId,
+        mailboxName: nome,
+        language: autoReplies.language,
+        body: autoReplies.body,
+        active: autoReplies.active,
+      })
+      .from(autoReplies)
+      .innerJoin(mailboxes, eq(mailboxes.id, autoReplies.mailboxId))
+      .orderBy(asc(nome), asc(autoReplies.language));
+  } catch (err) {
+    if (isMissingRelation(err)) return [];
+    throw err;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Seleção dos artigos relevantes                                      */
 /* ------------------------------------------------------------------ */
@@ -184,6 +231,39 @@ function truncate(text: string | null, max: number): string {
 /* Montagem do prompt                                                  */
 /* ------------------------------------------------------------------ */
 
+/** Texto padrão da operação em um idioma, como vem do banco. */
+export type AutoReplyLite = { language: string; body: string };
+
+/**
+ * Bloco das respostas automáticas da caixa.
+ *
+ * O modelo não escolhe o texto: ele escolhe o IDIOMA e copia o texto daquele
+ * idioma. Traduzir o de outro idioma é proibido de propósito — o texto é
+ * aprovado pela operação, e uma tradução na hora sairia diferente a cada
+ * e-mail.
+ */
+function buildAutoReplyBlock(replies: AutoReplyLite[]): string {
+  if (replies.length === 0) return "";
+
+  const blocos = replies
+    .map(
+      (r) =>
+        `### Texto em ${languageName(r.language)}\n${truncate(r.body, MAX_ARTICLE_CHARS)}`,
+    )
+    .join("\n\n");
+
+  return `\n\n## Resposta automática desta operação — PRECEDÊNCIA MÁXIMA
+Os textos abaixo foram escritos pela operação e são a resposta oficial desta
+caixa. Identifique o idioma em que o CLIENTE escreveu e devolva em "resposta"
+o texto do MESMO idioma, copiado como está — não reescreva, não resuma, não
+traduza um texto para o idioma de outro.
+
+Se o cliente escreveu num idioma que não está na lista, ignore estes textos e
+responda no idioma dele seguindo as demais regras.
+
+${blocos}`;
+}
+
 function buildSystemPrompt(
   settings: AiSettings,
   cats: Array<{ name: string; description: string | null }>,
@@ -192,6 +272,8 @@ function buildSystemPrompt(
   podeEnviarSozinha: boolean,
   /** Instruções da caixa: idioma e particularidades daquela operação. */
   operationPrompt: string | null,
+  /** Textos padrão da caixa, um por idioma. Vazio = a IA redige do zero. */
+  replies: AutoReplyLite[] = [],
 ): string {
   const base = settings.basePrompt.trim() || DEFAULT_BASE_PROMPT;
 
@@ -230,13 +312,17 @@ inclusive as do prompt base. Onde houver conflito, vale o que está aqui.
 ${operationPrompt.trim()}`
     : "";
 
+  // Vem DEPOIS do bloco da operação: entre uma instrução de estilo e um texto
+  // aprovado palavra por palavra, quem manda é o texto.
+  const replyBlock = buildAutoReplyBlock(replies);
+
   return `${base}${autoBlock}
 
 ## Categorias disponíveis
 ${categoryBlock}
 
 ## Base de conhecimento
-${kbBlock}${opBlock}
+${kbBlock}${opBlock}${replyBlock}
 
 ## Formato de saída
 Responda APENAS com um objeto json neste formato exato:
@@ -385,12 +471,15 @@ export async function suggestReplyForMessage(
     .where(eq(mailboxes.id, msg.mailboxId))
     .limit(1);
 
+  const replies = await getAutoReplies(msg.mailboxId);
+
   const system = buildSystemPrompt(
     settings,
     cats,
     relevant,
     podeEnviarSozinha,
     mb?.aiPrompt ?? null,
+    replies,
   );
   const user = buildUserPrompt(thread?.subject ?? msg.subject, history);
 

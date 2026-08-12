@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { AuthError } from "next-auth";
 import { auth, signIn, signOut } from "@/lib/auth";
 import { db } from "@/db";
@@ -13,6 +13,7 @@ import {
   knowledgeBase,
   aiSettings,
   aiActions,
+  autoReplies,
   mailboxes,
 } from "@/db/schema";
 import { sendReply, verifySmtp } from "@/lib/smtp";
@@ -22,7 +23,7 @@ import { isAiConfigured } from "@/lib/deepseek";
 import { verifyImap, skipToLatest } from "@/lib/imap";
 import { runCleanup } from "@/lib/retention";
 import { deleteLead, EverinboxError } from "@/lib/everinbox";
-import { isCategory, STATUS_LABELS } from "@/lib/ui";
+import { isCategory, isLanguage, languageLabel, STATUS_LABELS } from "@/lib/ui";
 
 const VALID_STATUS = ["aberto", "fechado"] as const;
 
@@ -482,6 +483,82 @@ export async function saveAiSettingsAction(formData: FormData) {
     })
     .where(eq(aiSettings.id, 1));
 
+  revalidatePath("/base");
+}
+
+/* ------------------------------------------------------------------ */
+/* Respostas automáticas (texto padrão por caixa e idioma)             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Cria ou edita o texto padrão de uma caixa num idioma. Com `id` no form,
+ * edita.
+ *
+ * Devolve mensagem em vez de lançar: o erro mais provável aqui é tentar um
+ * segundo texto no mesmo idioma da mesma caixa, e isso é uma correção de
+ * formulário — não merece tela de erro.
+ */
+export async function saveAutoReplyAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  await requireAdmin();
+
+  const rawId = String(formData.get("id") ?? "").trim();
+  const id = rawId ? Number(rawId) : null;
+  const mailboxId = Number(String(formData.get("mailboxId") ?? "").trim());
+  const language = String(formData.get("language") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const active = formData.get("active") === "on";
+
+  if (!Number.isInteger(mailboxId) || mailboxId <= 0) {
+    return "Selecione a caixa que vai usar esta resposta.";
+  }
+  if (!isLanguage(language)) return "Selecione o idioma da resposta.";
+  if (!body) return "Cole o texto da resposta.";
+
+  // Um texto por caixa e idioma — o mesmo que o índice único garante no banco.
+  // Checado antes para devolver frase legível em vez do erro cru do Postgres.
+  const [conflito] = await db
+    .select({ id: autoReplies.id })
+    .from(autoReplies)
+    .where(
+      and(
+        eq(autoReplies.mailboxId, mailboxId),
+        eq(autoReplies.language, language),
+        id ? ne(autoReplies.id, id) : undefined,
+      ),
+    )
+    .limit(1);
+
+  if (conflito) {
+    return `Essa caixa já tem uma resposta em ${languageLabel(language)}. Edite a existente.`;
+  }
+
+  try {
+    if (id) {
+      await db
+        .update(autoReplies)
+        .set({ mailboxId, language, body, active, updatedAt: new Date() })
+        .where(eq(autoReplies.id, id));
+    } else {
+      await db.insert(autoReplies).values({ mailboxId, language, body, active });
+    }
+  } catch (err) {
+    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
+
+  revalidatePath("/base");
+  return `Resposta em ${languageLabel(language)} salva.`;
+}
+
+/** Remove o texto padrão de um idioma. Sem desfazer. */
+export async function deleteAutoReplyAction(formData: FormData) {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  if (!Number.isInteger(id) || id <= 0) return;
+
+  await db.delete(autoReplies).where(eq(autoReplies.id, id));
   revalidatePath("/base");
 }
 

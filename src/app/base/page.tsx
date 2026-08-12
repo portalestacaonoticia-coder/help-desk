@@ -1,10 +1,17 @@
+import { asc, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import AppShell from "@/app/_components/AppShell";
-import { getAiSettings, DEFAULT_BASE_PROMPT } from "@/lib/ai";
+import { db } from "@/db";
+import { mailboxes } from "@/db/schema";
+import { getAiSettings, listAutoReplies, DEFAULT_BASE_PROMPT } from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
 import { saveAiSettingsAction } from "@/app/actions";
+import AutoReplyManager from "./_components/AutoReplyManager";
 
 export const dynamic = "force-dynamic";
+
+/** Nome de exibição da caixa: operação quando existe, senão o rótulo. */
+const MAILBOX_NAME = sql<string>`coalesce(nullif(${mailboxes.operation}, ''), ${mailboxes.label})`;
 
 export default async function BasePage() {
   const session = await auth();
@@ -12,6 +19,12 @@ export default async function BasePage() {
 
   const settings = await getAiSettings();
   const aiReady = isAiConfigured();
+
+  const autoReplies = await listAutoReplies();
+  const mbList = await db
+    .select({ id: mailboxes.id, nome: MAILBOX_NAME })
+    .from(mailboxes)
+    .orderBy(asc(mailboxes.label));
 
   return (
     <AppShell>
@@ -146,6 +159,35 @@ export default async function BasePage() {
             )}
           </form>
         </div>
+
+        {/* Fica FORA do formulário acima: aquele salva a linha única de
+            configuração, este mexe numa tabela com várias linhas — e form
+            dentro de form não é html válido. */}
+        <div className="page-head" style={{ marginTop: 32 }}>
+          <div>
+            <h1 style={{ fontSize: 20 }}>Respostas automáticas por idioma</h1>
+            <p className="page-sub">
+              O prompt acima é o guia geral, igual para todas as caixas. Aqui
+              fica o texto que vai ao cliente: um por idioma em cada caixa. A
+              IA identifica o idioma do e-mail e responde com o texto daquele
+              idioma, sem traduzir nem reescrever.
+            </p>
+          </div>
+        </div>
+
+        {mbList.length === 0 ? (
+          <div className="callout warn">
+            <strong>Nenhuma caixa cadastrada.</strong> Cadastre a caixa em{" "}
+            <span className="mono">/caixas</span> antes de escrever a resposta
+            automática dela.
+          </div>
+        ) : (
+          <AutoReplyManager
+            replies={autoReplies}
+            mailboxes={mbList}
+            isAdmin={isAdmin}
+          />
+        )}
       </section>
     </AppShell>
   );

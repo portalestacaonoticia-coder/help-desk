@@ -21,6 +21,35 @@ export function isCategory(value: string): value is Category {
   return (CATEGORIES as readonly string[]).includes(value);
 }
 
+/**
+ * Idiomas atendidos pela operação. A resposta automática é UM texto por
+ * idioma, escrito por quem atende — não uma tradução que a IA improvisa na
+ * hora, que sairia diferente a cada e-mail.
+ *
+ * `nome` é o que vai no prompt: o modelo lê melhor "espanhol" do que "es".
+ */
+export const LANGUAGES = [
+  { code: "pt", label: "Português", nome: "português" },
+  { code: "es", label: "Espanhol", nome: "espanhol" },
+  { code: "en", label: "Inglês", nome: "inglês" },
+] as const;
+
+export type LanguageCode = (typeof LANGUAGES)[number]["code"];
+
+export function isLanguage(value: string): value is LanguageCode {
+  return LANGUAGES.some((l) => l.code === value);
+}
+
+/** Rótulo de tela ("Espanhol"). Código desconhecido volta como veio. */
+export function languageLabel(code: string): string {
+  return LANGUAGES.find((l) => l.code === code)?.label ?? code;
+}
+
+/** Nome usado dentro do prompt da IA ("espanhol"). */
+export function languageName(code: string): string {
+  return LANGUAGES.find((l) => l.code === code)?.nome ?? code;
+}
+
 export function initials(value: string | null | undefined): string {
   if (!value) return "—";
   const name = value.includes("@") ? value.split("@")[0] : value;
