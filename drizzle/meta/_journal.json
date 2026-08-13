@@ -78,6 +78,13 @@
       "when": 1786400000000,
       "tag": "0010_respostas_automaticas",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786500000000,
+      "tag": "0011_fechar_respondidos_automaticamente",
+      "breakpoints": true
     }
   ]
 }

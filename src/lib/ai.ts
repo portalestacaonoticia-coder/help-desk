@@ -649,6 +649,26 @@ export async function suggestReplyForMessage(
       }
     }
 
+    // Resposta automática encerra o chamado: o cliente já foi respondido com
+    // o texto aprovado da operação, e deixar isso "aberto" enche a fila de
+    // conversas que ninguém precisa abrir. Não é definitivo — mensagem nova
+    // do cliente reabre na ingestão (ver lib/imap.ts).
+    //
+    // Em bloco próprio e engolindo o erro: o e-mail JÁ saiu, e falhar aqui
+    // não pode transformar um envio bem-sucedido em análise com erro.
+    if (actionTaken === "auto_enviado") {
+      try {
+        await db
+          .update(threads)
+          .set({ status: "fechado" })
+          .where(eq(threads.id, msg.threadId));
+      } catch (err) {
+        autoSendError = `resposta enviada, mas o status não fechou: ${
+          err instanceof Error ? err.message : String(err)
+        }`;
+      }
+    }
+
     await db
       .insert(aiActions)
       .values({
