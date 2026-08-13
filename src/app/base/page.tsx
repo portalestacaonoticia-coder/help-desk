@@ -3,10 +3,16 @@ import { auth } from "@/lib/auth";
 import AppShell from "@/app/_components/AppShell";
 import { db } from "@/db";
 import { mailboxes } from "@/db/schema";
-import { getAiSettings, listAutoReplies, DEFAULT_BASE_PROMPT } from "@/lib/ai";
+import {
+  getAiSettings,
+  getAutoSendDiagnosis,
+  listAutoReplies,
+  DEFAULT_BASE_PROMPT,
+} from "@/lib/ai";
 import { isAiConfigured } from "@/lib/deepseek";
 import { saveAiSettingsAction } from "@/app/actions";
 import AutoReplyManager from "./_components/AutoReplyManager";
+import AutoSendDiagnostics from "./_components/AutoSendDiagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +33,7 @@ export default async function BasePage() {
   const aiReady = isAiConfigured();
 
   const autoReplies = await listAutoReplies();
+  const diag = await getAutoSendDiagnosis();
   const mbList = await db
     .select({ id: mailboxes.id, nome: MAILBOX_NAME })
     .from(mailboxes)
@@ -163,6 +170,10 @@ export default async function BasePage() {
               isAdmin={isAdmin}
             />
           )}
+
+          {/* Depois da lista e antes da trava: é aqui que a pergunta "por que
+              não enviou?" aparece, com o estado real do banco desta app. */}
+          <AutoSendDiagnostics diag={diag} />
 
           <label className="check" style={{ marginTop: 20 }}>
             <input

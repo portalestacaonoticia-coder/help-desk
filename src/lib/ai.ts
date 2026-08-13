@@ -1,10 +1,21 @@
-import { and, eq, desc, asc, isNull, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  desc,
+  asc,
+  gt,
+  isNull,
+  isNotNull,
+  inArray,
+  sql,
+} from "drizzle-orm";
 import { db } from "@/db";
 import {
   aiActions,
   aiSettings,
   autoReplies,
   categories,
+  ingestLogs,
   knowledgeBase,
   mailboxes,
   messages,
@@ -164,6 +175,92 @@ export async function listAutoReplies() {
     if (isMissingRelation(err)) return [];
     throw err;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Diagnóstico do envio automático                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Estado de cada pré-condição do envio automático.
+ *
+ * O caminho até o e-mail sair tem sete elos (migration, texto cadastrado,
+ * chave, IA ligada, trava do envio, cron, liberação do modelo) e todos eles
+ * falham em silêncio de propósito — nenhum pode derrubar a ingestão. O preço
+ * é que "não funciona" não diz onde parou. Isto diz.
+ */
+export type AutoSendDiag = {
+  tabelaOk: boolean;
+  respostasAtivas: number;
+  chaveDeepSeek: boolean;
+  iaLigada: boolean;
+  envioAutomatico: boolean;
+  ultimoCron: { quando: Date; status: string } | null;
+  ultimas24h: Array<{ acao: string; n: number }>;
+  ultimoErro: { msg: string; quando: Date } | null;
+};
+
+export async function getAutoSendDiagnosis(): Promise<AutoSendDiag> {
+  const settings = await getAiSettingsSafe();
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  let tabelaOk = true;
+  let respostasAtivas = 0;
+  try {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(autoReplies)
+      .where(eq(autoReplies.active, true));
+    respostasAtivas = row?.n ?? 0;
+  } catch (err) {
+    if (isMissingRelation(err)) tabelaOk = false;
+    else throw err;
+  }
+
+  let ultimoCron: AutoSendDiag["ultimoCron"] = null;
+  try {
+    const [row] = await db
+      .select({ quando: ingestLogs.createdAt, status: ingestLogs.status })
+      .from(ingestLogs)
+      .orderBy(desc(ingestLogs.createdAt))
+      .limit(1);
+    ultimoCron = row ?? null;
+  } catch (err) {
+    if (!isMissingRelation(err)) throw err;
+  }
+
+  let ultimas24h: AutoSendDiag["ultimas24h"] = [];
+  let ultimoErro: AutoSendDiag["ultimoErro"] = null;
+  try {
+    ultimas24h = (
+      await db
+        .select({ acao: aiActions.actionTaken, n: sql<number>`count(*)::int` })
+        .from(aiActions)
+        .where(gt(aiActions.createdAt, desde))
+        .groupBy(aiActions.actionTaken)
+    ).map((r) => ({ acao: r.acao ?? "(sem ação)", n: r.n }));
+
+    const [err] = await db
+      .select({ msg: aiActions.errorMessage, quando: aiActions.createdAt })
+      .from(aiActions)
+      .where(isNotNull(aiActions.errorMessage))
+      .orderBy(desc(aiActions.createdAt))
+      .limit(1);
+    if (err?.msg) ultimoErro = { msg: err.msg, quando: err.quando };
+  } catch (err) {
+    if (!isMissingRelation(err)) throw err;
+  }
+
+  return {
+    tabelaOk,
+    respostasAtivas,
+    chaveDeepSeek: isAiConfigured(),
+    iaLigada: settings.enabled,
+    envioAutomatico: settings.autoSendEnabled,
+    ultimoCron,
+    ultimas24h,
+    ultimoErro,
+  };
 }
 
 /* ------------------------------------------------------------------ */
