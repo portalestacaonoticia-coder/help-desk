@@ -953,6 +953,12 @@ a.trow:hover {
   background: hsl(220 20% 94%);
   color: hsl(var(--muted-foreground));
 }
+/* Resposta que saiu pela IA, sem ninguém revisar. Cor própria de propósito:
+   não é o verde de "um agente respondeu" nem um estado de erro. */
+.badge.auto {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
 /* Estado saudável genérico (ingestão ok, categoria auto-respondível). */
 .badge.ok {
   background: hsl(var(--success) / 0.12);

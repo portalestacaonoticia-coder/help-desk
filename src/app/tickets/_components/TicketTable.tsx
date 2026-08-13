@@ -18,6 +18,8 @@ export type TicketRow = {
   preview: string;
   /** A última mensagem da conversa é nossa, não do cliente. */
   answered: boolean;
+  /** A última resposta saiu pela IA, sem revisão de ninguém. */
+  answeredByAi: boolean;
 };
 
 function DeleteButton({ count }: { count: number }) {
@@ -149,7 +151,16 @@ export default function TicketTable({
               <Link href={`/tickets/${t.id}`} style={{ minWidth: 0 }}>
                 <div className="t-subject">
                   {t.subject || "(sem assunto)"}
-                  {t.answered && <span className="badge ok">Respondido</span>}
+                  {/* Dois selos distintos: "Respondido" continua significando
+                      que um agente escreveu. O que saiu sozinho tem selo
+                      próprio — é o que alguém precisa reler primeiro. */}
+                  {t.answered && (
+                    <span className={`badge ${t.answeredByAi ? "auto" : "ok"}`}>
+                      {t.answeredByAi
+                        ? "Respondido Automaticamente"
+                        : "Respondido"}
+                    </span>
+                  )}
                 </div>
                 <div className="t-preview">
                   {t.customerAddr ? `${t.customerAddr} · ` : ""}
@@ -158,7 +169,13 @@ export default function TicketTable({
                     <>
                       {" · "}
                       {/* Deixa claro de quem é o texto da prévia. */}
-                      {t.answered && <strong>Nossa resposta: </strong>}
+                      {t.answered && (
+                        <strong>
+                          {t.answeredByAi
+                            ? "Resposta automática: "
+                            : "Nossa resposta: "}
+                        </strong>
+                      )}
                       {t.preview}
                     </>
                   ) : null}

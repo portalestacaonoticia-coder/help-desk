@@ -94,22 +94,31 @@ export default async function TicketsPage({
   // A direção vem junto: sem ela, a nossa própria resposta aparecia na fila
   // como se fosse a fala do cliente.
   const ids = rows.map((r) => r.id);
-  const previews = new Map<number, { text: string; outbound: boolean }>();
+  const previews = new Map<
+    number,
+    { text: string; outbound: boolean; porIa: boolean }
+  >();
   if (ids.length > 0) {
     const prevRows = await db.execute<{
       thread_id: number;
       body_text: string | null;
       direction: string;
+      sent_by_user_id: number | null;
     }>(
-      sql`select distinct on (thread_id) thread_id, body_text, direction
+      sql`select distinct on (thread_id) thread_id, body_text, direction,
+                 sent_by_user_id
           from ${messages}
           where thread_id in ${ids}
           order by thread_id, created_at desc`,
     );
     for (const r of prevRows) {
+      const outbound = r.direction === "outbound";
       previews.set(Number(r.thread_id), {
         text: (r.body_text ?? "").replace(/\s+/g, " ").trim(),
-        outbound: r.direction === "outbound",
+        outbound,
+        // sent_by_user_id nulo em outbound = quem mandou foi a IA. É a mesma
+        // convenção que sendReply usa ao gravar o envio automático.
+        porIa: outbound && r.sent_by_user_id === null,
       });
     }
   }
@@ -232,6 +241,7 @@ export default async function TicketsPage({
             ...t,
             preview: previews.get(t.id)?.text ?? "",
             answered: previews.get(t.id)?.outbound ?? false,
+            answeredByAi: previews.get(t.id)?.porIa ?? false,
           }))}
         />
 

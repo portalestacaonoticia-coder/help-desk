@@ -136,8 +136,13 @@ export default async function TicketPage({
                           <div className="msg-head">
                             <strong>{m.fromAddr || "(desconhecido)"}</strong>
                             <span>
-                              {out ? "resposta" : "via e-mail"} ·{" "}
-                              {fmtDateTime(m.sentAt ?? m.createdAt)}
+                              {/* Outbound sem usuário = enviada pela IA. */}
+                              {out
+                                ? m.sentByUserId === null
+                                  ? "resposta automática"
+                                  : "resposta"
+                                : "via e-mail"}{" "}
+                              · {fmtDateTime(m.sentAt ?? m.createdAt)}
                             </span>
                           </div>
                           <div className="msg-bubble">
