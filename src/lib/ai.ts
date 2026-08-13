@@ -241,6 +241,14 @@ export type AutoReplyLite = { language: string; body: string };
  * idioma. Traduzir o de outro idioma é proibido de propósito — o texto é
  * aprovado pela operação, e uma tradução na hora sairia diferente a cada
  * e-mail.
+ *
+ * O bloco também RESOLVE `posso_enviar` quando usa um destes textos. Sem
+ * isso o envio automático nunca dispara: as condições gerais mandam liberar
+ * só quando "o material cobre o caso por completo", e diante de um texto
+ * pronto o modelo hesita e devolve false — o rascunho sai certo e o e-mail
+ * fica parado. Quem decidiu que este texto pode ir sem revisão foi a
+ * operação, ao cadastrá-lo; ao modelo cabe só dizer se o texto responde ao
+ * que o cliente perguntou.
  */
 function buildAutoReplyBlock(replies: AutoReplyLite[]): string {
   if (replies.length === 0) return "";
@@ -257,6 +265,16 @@ Os textos abaixo foram escritos pela operação e são a resposta oficial desta
 caixa. Identifique o idioma em que o CLIENTE escreveu e devolva em "resposta"
 o texto do MESMO idioma, copiado como está — não reescreva, não resuma, não
 traduza um texto para o idioma de outro.
+
+Estes textos já foram aprovados pela operação para ir ao cliente sem revisão.
+Então, quando você responder com um deles porque ele atende o que o cliente
+pediu, devolva "posso_enviar": true e "precisa_humano": false — não reavalie
+o conteúdo do texto, ele não é seu.
+
+Mantenha "posso_enviar": false e "precisa_humano": true quando o texto NÃO
+serve para aquele e-mail: o cliente pede algo que ele não trata, cobra uma
+resposta anterior, reclama, ou pede prazo, valor, exceção ou dado de conta.
+Aí não use o texto — responda pelas regras normais.
 
 Se o cliente escreveu num idioma que não está na lista, ignore estes textos e
 responda no idioma dele seguindo as demais regras.
