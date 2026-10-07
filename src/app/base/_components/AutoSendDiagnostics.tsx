@@ -36,7 +36,7 @@ export default function AutoSendDiagnostics({ diag }: { diag: AutoSendDiag }) {
       label: "Respostas automáticas ativas",
       detalhe: `${diag.respostasAtivas} cadastrada${diag.respostasAtivas === 1 ? "" : "s"}`,
     },
-    { ok: diag.chaveDeepSeek, label: "DEEPSEEK_API_KEY configurada" },
+    { ok: diag.chaveOpenAI, label: "OPENAI_API_KEY configurada" },
     { ok: diag.iaLigada, label: "Geração de rascunhos ligada" },
     { ok: diag.envioAutomatico, label: "Envio automático ligado" },
     {
@@ -67,8 +67,8 @@ export default function AutoSendDiagnostics({ diag }: { diag: AutoSendDiag }) {
     if (diag.respostasAtivas === 0) {
       return "Não há resposta automática ativa neste banco. Se você cadastrou em outro ambiente (local x produção), a IA aqui não vê nada.";
     }
-    if (!diag.chaveDeepSeek) {
-      return "DEEPSEEK_API_KEY não está no ambiente — a IA não é chamada.";
+    if (!diag.chaveOpenAI) {
+      return "OPENAI_API_KEY não está no ambiente — a IA não é chamada.";
     }
     if (!diag.iaLigada) {
       return "A geração de rascunhos está desligada logo acima nesta tela.";

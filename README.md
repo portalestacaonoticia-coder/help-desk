@@ -2,7 +2,7 @@
 
 Central própria de suporte por e-mail: ingere as caixas de suporte (IMAP),
 agrupa em tickets e permite que a equipe responda pelo dashboard (SMTP da
-própria caixa de origem). A IA (DeepSeek) lê cada e-mail novo e prepara um
+própria caixa de origem). A IA (OpenAI, modelo gpt-6-luna) lê cada e-mail novo e prepara um
 rascunho de resposta a partir da base de conhecimento — **sempre rascunho**:
 nada sai para o cliente sem um clique do agente.
 
@@ -12,13 +12,13 @@ nada sai para o cliente sem um clique do agente.
 - **Fase 1** — Ingestão IMAP idempotente das caixas, com threading e log por caixa. ✅
 - **Fase 2** — Auth, dashboard (lista + ticket), resposta via SMTP, macros. ✅
 - **Fase 3** — Base de conhecimento, categorias e prompt base editáveis. ✅
-- **Fase 4** — Classificação e rascunho de resposta via DeepSeek, com trilha em `ai_actions`. ✅
+- **Fase 4** — Classificação e rascunho de resposta via OpenAI, com trilha em `ai_actions`. ✅
 - **Fase 5** — Alertas de cron, métricas e dashboard. ⏳
 
 ## Stack
 
 Next.js 15 · Drizzle ORM · Postgres (Neon em prod / Docker em dev) · imapflow +
-mailparser · Nodemailer · Auth.js v5 · DeepSeek · Vercel Cron.
+mailparser · Nodemailer · Auth.js v5 · OpenAI · Vercel Cron.
 
 ## Como a IA funciona
 
@@ -30,7 +30,7 @@ analisada. Para cada uma:
    e-mail (busca lexical, sem embeddings — custo zero e suficiente para uma KB
    interna).
 2. Monta o prompt: prompt base + categorias + até 6 artigos + histórico da thread.
-3. Chama o DeepSeek em modo JSON e grava categoria, confiança, resumo e rascunho
+3. Chama a OpenAI (gpt-6-luna) em modo JSON e grava categoria, confiança, resumo e rascunho
    em `ai_actions`.
 
 O rascunho aparece no chamado como o card "Sugestão de resposta", com as fontes
@@ -39,7 +39,7 @@ e-mail**: `ai_settings.auto_send_enabled` e `categories.auto_respondivel` existe
 no schema para um rollout futuro, mas nenhum código de envio automático lê esses
 campos hoje.
 
-Sem `DEEPSEEK_API_KEY` a aplicação roda normalmente — só não gera rascunhos, e a
+Sem `OPENAI_API_KEY` a aplicação roda normalmente — só não gera rascunhos, e a
 base de conhecimento continua editável.
 
 ## Rodando localmente
@@ -104,7 +104,7 @@ Ver `.env.example`. Destaques:
 | `NEXTAUTH_SECRET` | Segredo de sessão do Auth.js. |
 | `ENCRYPTION_KEY` | 32 bytes base64. Cifra as senhas das caixas. **Trocar invalida as senhas cifradas.** |
 | `CRON_SECRET` | Protege `/api/cron/ingest`. O Vercel envia como `Bearer`. |
-| `DEEPSEEK_API_KEY` | Rascunhos da IA. Sem ela a app roda, só não sugere. |
+| `OPENAI_API_KEY` | Rascunhos da IA. Sem ela a app roda, só não sugere. |
 
 As caixas **não** ficam em env — ficam na tabela `mailboxes` (senhas cifradas).
 
@@ -125,7 +125,7 @@ src/
     threading.ts normalização de assunto / agrupamento
     smtp.ts      envio de resposta (Nodemailer)
     auth.ts      Auth.js v5 (credenciais)
-    deepseek.ts  cliente da API do DeepSeek (chat completions + JSON mode)
+    openai.ts    cliente da API da OpenAI (chat completions + JSON mode)
     ai.ts        prompt, ranking da KB, classificação e rascunho
     ui.ts        helpers de formatação da interface
   app/
@@ -173,5 +173,5 @@ O script é idempotente e imprime a contagem antes e depois.
 - Calibrar o limiar de confiança olhando `ai_actions` (quantas sugestões foram
   marcadas `usada` vs `descartada`).
 - Fase 5: dashboard de métricas, alertas quando uma caixa falha no cron,
-  retry/rate-limit na chamada ao DeepSeek.
+  retry/rate-limit na chamada à OpenAI.
 - Só depois disso avaliar ligar o envio automático, categoria a categoria.

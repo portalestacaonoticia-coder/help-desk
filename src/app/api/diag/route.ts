@@ -10,7 +10,7 @@ import { db } from "@/db";
  *   curl -H "Authorization: Bearer $CRON_SECRET" https://.../api/diag
  *
  * Não devolve dado de cliente — nomes de tabela/coluna, contagens e mensagens
- * de erro operacionais (SMTP/DeepSeek), truncadas.
+ * de erro operacionais (SMTP/OpenAI), truncadas.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -159,7 +159,7 @@ export async function GET(request: Request) {
       aiLast24h,
       lastAiError,
       env: {
-        DEEPSEEK_API_KEY: Boolean(process.env.DEEPSEEK_API_KEY),
+        OPENAI_API_KEY: Boolean(process.env.OPENAI_API_KEY),
         ENCRYPTION_KEY: Boolean(process.env.ENCRYPTION_KEY),
         CRON_SECRET: Boolean(process.env.CRON_SECRET),
         authSecret: Boolean(

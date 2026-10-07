@@ -97,7 +97,7 @@ function SuggestionCard({
   signature: string | null;
   onUse: (text: string) => void;
 }) {
-  // Falha na chamada ao DeepSeek: mostra o erro e oferece nova tentativa.
+  // Falha na chamada à OpenAI: mostra o erro e oferece nova tentativa.
   if (suggestion.errorMessage) {
     return (
       <div className="callout danger">

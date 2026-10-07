@@ -177,7 +177,7 @@ export const ingestLogs = pgTable("ingest_logs", {
 ]);
 
 /* ------------------------------------------------------------------ */
-/* Fases 3-4 — classificação e sugestão de resposta por IA (DeepSeek). */
+/* Fases 3-4 — classificação e sugestão de resposta por IA (OpenAI). */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -224,7 +224,7 @@ export const knowledgeBase = pgTable("knowledge_base", {
 export const aiSettings = pgTable("ai_settings", {
   id: integer("id").primaryKey().default(1),
   enabled: boolean("enabled").notNull().default(true),
-  model: text("model").notNull().default("deepseek-v4-flash"),
+  model: text("model").notNull().default("gpt-6-luna"),
   basePrompt: text("base_prompt").notNull().default(""),
   // Instruções extras que a IA segue APENAS quando vai enviar sozinha. Ficam
   // separadas do prompt base de propósito: as regras de quem responde sem

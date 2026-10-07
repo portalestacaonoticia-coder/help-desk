@@ -12,7 +12,7 @@ import {
   getLatestSuggestion,
   getSuggestionSources,
 } from "@/lib/ai";
-import { isAiConfigured } from "@/lib/deepseek";
+import { isAiConfigured } from "@/lib/openai";
 import {
   STATUS_LABELS,
   colorClass,
@@ -88,7 +88,7 @@ export default async function TicketPage({
   const lastInbound = [...msgs].reverse().find((m) => m.direction === "inbound");
 
   const aiUnavailableReason = !isAiConfigured()
-    ? "DEEPSEEK_API_KEY não está configurada no ambiente."
+    ? "OPENAI_API_KEY não está configurada no ambiente."
     : !settings.enabled
       ? "A geração automática está desligada nas configurações da base de conhecimento."
       : "Você pode gerar sob demanda.";

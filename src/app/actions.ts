@@ -19,7 +19,7 @@ import {
 import { sendReply, verifySmtp } from "@/lib/smtp";
 import { encryptSecret } from "@/lib/crypto";
 import { suggestReplyForMessage, getAiSettings } from "@/lib/ai";
-import { isAiConfigured } from "@/lib/deepseek";
+import { isAiConfigured, resolveModel } from "@/lib/openai";
 import { verifyImap, skipToLatest } from "@/lib/imap";
 import { runCleanup } from "@/lib/retention";
 import { deleteLead, EverinboxError } from "@/lib/everinbox";
@@ -486,7 +486,7 @@ export async function saveAiSettingsAction(formData: FormData) {
   }
 
   const basePrompt = String(formData.get("basePrompt") ?? "").trim();
-  const model = String(formData.get("model") ?? "").trim() || "deepseek-v4-flash";
+  const model = resolveModel(String(formData.get("model") ?? "").trim());
   const enabled = formData.get("enabled") === "on";
   const autoSendPrompt = String(formData.get("autoSendPrompt") ?? "").trim();
   const autoSendEnabled = formData.get("autoSendEnabled") === "on";
@@ -610,7 +610,7 @@ export async function generateSuggestionAction(
   if (!settings.enabled) {
     return "A geração está desligada nas configurações da base de conhecimento.";
   }
-  if (!isAiConfigured()) return "DEEPSEEK_API_KEY não está configurada.";
+  if (!isAiConfigured()) return "OPENAI_API_KEY não está configurada.";
 
   // Regenerar: remove a análise anterior daquela mensagem.
   await db.delete(aiActions).where(eq(aiActions.messageId, messageId));

@@ -9,7 +9,7 @@ import {
   listAutoReplies,
   DEFAULT_BASE_PROMPT,
 } from "@/lib/ai";
-import { isAiConfigured } from "@/lib/deepseek";
+import { isAiConfigured } from "@/lib/openai";
 import { saveAiSettingsAction } from "@/app/actions";
 import AutoReplyManager from "./_components/AutoReplyManager";
 import AutoSendDiagnostics from "./_components/AutoSendDiagnostics";
@@ -50,8 +50,8 @@ export default async function BasePage() {
 
         {!aiReady && (
           <div className="callout warn">
-            <strong>DeepSeek não configurado.</strong> Defina{" "}
-            <span className="mono">DEEPSEEK_API_KEY</span> no ambiente para a IA
+            <strong>OpenAI não configurada.</strong> Defina{" "}
+            <span className="mono">OPENAI_API_KEY</span> no ambiente para a IA
             começar a gerar rascunhos.
           </div>
         )}
@@ -75,8 +75,8 @@ export default async function BasePage() {
               defaultValue={settings.model}
               disabled={!isAdmin}
             >
-              <option value="deepseek-v4-flash">deepseek-v4-flash</option>
-              <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+              <option value="gpt-6-luna">gpt-6-luna (mais barato)</option>
+              <option value="gpt-6.1-sol">gpt-6.1-sol (mais capaz, ~20x o preço)</option>
             </select>
             <span className="hint">
               Vale para tudo: rascunhos e envio automático usam este modelo.

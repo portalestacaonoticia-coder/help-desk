@@ -23,7 +23,7 @@ import {
   type AiSettings,
   type KbArticle,
 } from "@/db/schema";
-import { chatJson, DeepSeekError, isAiConfigured, DEFAULT_MODEL } from "@/lib/deepseek";
+import { chatJson, OpenAIError, isAiConfigured, DEFAULT_MODEL, resolveModel } from "@/lib/openai";
 import { sendReply } from "@/lib/smtp";
 import { languageName } from "@/lib/ui";
 
@@ -192,7 +192,7 @@ export async function listAutoReplies() {
 export type AutoSendDiag = {
   tabelaOk: boolean;
   respostasAtivas: number;
-  chaveDeepSeek: boolean;
+  chaveOpenAI: boolean;
   iaLigada: boolean;
   envioAutomatico: boolean;
   ultimoCron: { quando: Date; status: string } | null;
@@ -254,7 +254,7 @@ export async function getAutoSendDiagnosis(): Promise<AutoSendDiag> {
   return {
     tabelaOk,
     respostasAtivas,
-    chaveDeepSeek: isAiConfigured(),
+    chaveOpenAI: isAiConfigured(),
     iaLigada: settings.enabled,
     envioAutomatico: settings.autoSendEnabled,
     ultimoCron,
@@ -541,7 +541,7 @@ export async function suggestReplyForMessage(
 
   const settings = await getAiSettings();
   if (!settings.enabled) return { ok: false, error: "IA desativada nas configurações" };
-  if (!isAiConfigured()) return { ok: false, error: "DEEPSEEK_API_KEY não configurada" };
+  if (!isAiConfigured()) return { ok: false, error: "OPENAI_API_KEY não configurada" };
 
   const [thread] = await db
     .select()
@@ -604,7 +604,7 @@ export async function suggestReplyForMessage(
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      { model: settings.model || DEFAULT_MODEL },
+      { model: resolveModel(settings.model) },
     );
 
     const s = normalizeSuggestion(result.data);
@@ -696,7 +696,7 @@ export async function suggestReplyForMessage(
     return { ok: true };
   } catch (err) {
     const message =
-      err instanceof DeepSeekError || err instanceof Error
+      err instanceof OpenAIError || err instanceof Error
         ? err.message
         : String(err);
 
@@ -708,7 +708,7 @@ export async function suggestReplyForMessage(
         threadId: msg.threadId,
         actionTaken: "erro",
         errorMessage: message.slice(0, 1000),
-        model: settings.model,
+        model: resolveModel(settings.model),
         status: "pendente",
       })
       .onConflictDoNothing();
@@ -729,7 +729,7 @@ export async function processPendingMessages(limit = 20): Promise<{
   const settings = await getAiSettings();
   if (!settings.enabled) return { processed: 0, failed: 0, skipped: "IA desativada" };
   if (!isAiConfigured()) {
-    return { processed: 0, failed: 0, skipped: "DEEPSEEK_API_KEY não configurada" };
+    return { processed: 0, failed: 0, skipped: "OPENAI_API_KEY não configurada" };
   }
 
   // Mensagens inbound sem linha correspondente em ai_actions.
