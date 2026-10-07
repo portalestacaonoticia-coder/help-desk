@@ -22,7 +22,12 @@ export * from "@/lib/dashboard-fmt";
  *  - "respondidos"      → inbound que receberam um outbound depois, na mesma
  *                          thread. Contar outbound direto inflaria o número
  *                          quando o agente manda duas mensagens seguidas.
- *  - "cancelamentos"    → inbound cuja thread está categorizada "Cancelamento"
+ *  - "cancelamentos"    → contatos descadastrados na Everinbox (tela de
+ *                          Cancelamentos ou botão do chamado), contados no dia
+ *                          do descadastro, pela tabela contact_reviews. Somado
+ *                          ao legado: inbound em thread categorizada
+ *                          "Cancelamento", a única fonte antes da triagem
+ *                          existir — sem ele o histórico do gráfico zeraria.
  *  - "tempo de resposta"→ do inbound até o PRIMEIRO outbound posterior
  */
 
@@ -63,6 +68,9 @@ export async function getDashboard(
 
   const filtroCaixa = mailboxId
     ? sql`and m.mailbox_id = ${mailboxId}`
+    : sql``;
+  const filtroCaixaDescad = mailboxId
+    ? sql`and cr.mailbox_id = ${mailboxId}`
     : sql``;
 
   // Intervalos entram como literal: `interval` não aceita parâmetro no lugar
@@ -105,18 +113,39 @@ export async function getDashboard(
           ((select min(bucket) from periodos) at time zone ${TZ})
         ${filtroCaixa}
       group by 1, 2
+    ),
+    descadastros as (
+      select
+        date_trunc(${unit}, (cr.reviewed_at at time zone ${TZ})) as bucket,
+        cr.mailbox_id,
+        count(*)::int as n
+      from contact_reviews cr
+      where cr.status = 'descadastrado'
+        and cr.reviewed_at >=
+          ((select min(bucket) from periodos) at time zone ${TZ})
+        ${filtroCaixaDescad}
+      group by 1, 2
+    ),
+    -- Pares (período, caixa) com qualquer dado: um dia só com descadastros e
+    -- nenhum e-mail recebido também precisa aparecer.
+    chaves as (
+      select bucket, mailbox_id from entradas
+      union
+      select bucket, mailbox_id from descadastros
     )
     select
       to_char(p.bucket, 'YYYY-MM-DD') as bucket,
-      coalesce(e.mailbox_id, 0) as mailbox_id,
+      coalesce(k.mailbox_id, 0) as mailbox_id,
       coalesce(nullif(mb.operation, ''), mb.label, '—') as nome,
       coalesce(e.entradas, 0) as entradas,
       coalesce(e.respondidos, 0) as respondidos,
-      coalesce(e.cancelamentos, 0) as cancelamentos,
+      (coalesce(e.cancelamentos, 0) + coalesce(d.n, 0))::int as cancelamentos,
       coalesce(e.tempo_medio_seg, 0) as tempo_medio_seg
     from periodos p
-    left join entradas e on e.bucket = p.bucket
-    left join mailboxes mb on mb.id = e.mailbox_id
+    left join chaves k on k.bucket = p.bucket
+    left join entradas e on e.bucket = k.bucket and e.mailbox_id = k.mailbox_id
+    left join descadastros d on d.bucket = k.bucket and d.mailbox_id = k.mailbox_id
+    left join mailboxes mb on mb.id = k.mailbox_id
     order by p.bucket
   `);
 

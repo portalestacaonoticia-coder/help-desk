@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { AuthError } from "next-auth";
 import { auth, signIn, signOut } from "@/lib/auth";
 import { db } from "@/db";
@@ -348,7 +348,7 @@ export async function unsubscribeContactAction(
   _prev: string | undefined,
   formData: FormData,
 ): Promise<string | undefined> {
-  await requireUser();
+  const user = await requireUser();
   const threadId = Number(formData.get("threadId"));
 
   const [thread] = await db
@@ -363,6 +363,30 @@ export async function unsubscribeContactAction(
     thread.customerAddr,
     thread.mailboxId,
   );
+
+  // Registra igual à triagem: é daqui que a dashboard conta os cancelamentos,
+  // e assim o contato também não reaparece na tela de Cancelamentos.
+  if (result.ok) {
+    const [ultima] = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.threadId, threadId))
+      .orderBy(desc(messages.id))
+      .limit(1);
+    if (ultima) {
+      await saveContactReview(
+        {
+          mailboxId: thread.mailboxId,
+          email: thread.customerAddr.trim().toLowerCase(),
+          lastMessageId: ultima.id,
+        },
+        "descadastrado",
+        result.message,
+        Number(user.id) || null,
+      );
+    }
+  }
+
   revalidatePath(`/tickets/${threadId}`);
   return result.message;
 }
@@ -408,13 +432,26 @@ async function saveContactReview(
     })
     .onConflictDoUpdate({
       target: [contactReviews.mailboxId, contactReviews.email],
-      set: {
-        status,
-        lastMessageId: ref.lastMessageId,
-        note,
-        reviewedByUserId: userId,
-        reviewedAt: new Date(),
-      },
+      // Ignorar um contato que JÁ foi descadastrado (ele escreveu de novo) só
+      // avança a mensagem coberta. Status, nota, autor e data do descadastro
+      // ficam — senão o cancelamento sumiria da dashboard no dia em que
+      // aconteceu.
+      set:
+        status === "ignorado"
+          ? {
+              lastMessageId: ref.lastMessageId,
+              status: sql`case when ${contactReviews.status} = 'descadastrado' then 'descadastrado' else 'ignorado' end`,
+              note: sql`case when ${contactReviews.status} = 'descadastrado' then ${contactReviews.note} else null end`,
+              reviewedByUserId: sql`case when ${contactReviews.status} = 'descadastrado' then ${contactReviews.reviewedByUserId} else ${userId} end`,
+              reviewedAt: sql`case when ${contactReviews.status} = 'descadastrado' then ${contactReviews.reviewedAt} else now() end`,
+            }
+          : {
+              status,
+              lastMessageId: ref.lastMessageId,
+              note,
+              reviewedByUserId: userId,
+              reviewedAt: new Date(),
+            },
     });
 }
 
