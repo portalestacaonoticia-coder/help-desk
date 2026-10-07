@@ -42,6 +42,19 @@ campos hoje.
 Sem `OPENAI_API_KEY` a aplicação roda normalmente — só não gera rascunhos, e a
 base de conhecimento continua editável.
 
+## Triagem de cancelamentos
+
+A tela **Cancelamentos** reúne os contatos que escreveram, nas mensagens
+recebidas, termos como cancelar, Procon, processar, advogado e mentira — com
+tolerância a erro de digitação (cansela, procom, adivogado…). O texto citado da
+nossa resposta anterior é ignorado, senão qualquer reply entraria.
+
+**Nada é cancelado sozinho.** O agente seleciona (tudo ou um a um) e clica em
+cancelar inscrição: cada contato é removido dos projetos da Everinbox ligados à
+caixa, um por vez, com o resultado na própria linha. Também dá para marcar como
+ignorado. A decisão fica em `contact_reviews`; se o contato escrever de novo
+com os mesmos termos, volta para a lista.
+
 ## Rodando localmente
 
 ```bash
@@ -127,12 +140,15 @@ src/
     auth.ts      Auth.js v5 (credenciais)
     openai.ts    cliente da API da OpenAI (chat completions + JSON mode)
     ai.ts        prompt, ranking da KB, classificação e rascunho
+    cancel-terms.ts  termos de cancelamento com tolerância a erro de digitação
+    cancel-review.ts consulta da tela de cancelamentos (agrupa por contato)
     ui.ts        helpers de formatação da interface
   app/
     login/       tela de login
     tickets/     lista + [id] (thread, resposta, sugestão da IA, status)
     base/        base de conhecimento, categorias e prompt base
     caixas/      CRUD das caixas + teste de conexão + status do ingest
+    cancelamentos/  triagem de contatos que pediram cancelamento
     macros/      respostas prontas
     api/cron/ingest  endpoint do Vercel Cron (ingestão + rascunhos)
     actions.ts   server actions (login, reply, status, KB, caixas, sugestões)

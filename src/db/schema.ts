@@ -301,6 +301,32 @@ export const aiActions = pgTable("ai_actions", {
   uniqueIndex("ai_actions_message_uq").on(t.messageId),
 ]);
 
+/**
+ * Triagem de cancelamentos: o que o agente já decidiu sobre um contato que
+ * escreveu "cancelar", "Procon", "advogado"… (ver src/lib/cancel-terms.ts).
+ *
+ * Uma linha por (caixa, e-mail). `lastMessageId` é a mensagem mais recente
+ * que estava na triagem quando o agente decidiu: se o contato escrever de
+ * novo com os mesmos termos depois disso, volta para a tela — a decisão
+ * valeu para o que ele tinha dito até ali, não para sempre.
+ */
+export const contactReviews = pgTable("contact_reviews", {
+  id: serial("id").primaryKey(),
+  mailboxId: integer("mailbox_id")
+    .notNull()
+    .references(() => mailboxes.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  // descadastrado | ignorado
+  status: text("status").notNull(),
+  lastMessageId: integer("last_message_id").notNull(),
+  // O que a Everinbox respondeu, para conferência.
+  note: text("note"),
+  reviewedByUserId: integer("reviewed_by_user_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("contact_reviews_mailbox_email_uq").on(t.mailboxId, t.email),
+]);
+
 // Tipos inferidos, reaproveitados no resto do código.
 export type Mailbox = typeof mailboxes.$inferSelect;
 export type NewMailbox = typeof mailboxes.$inferInsert;
@@ -313,3 +339,4 @@ export type KbArticle = typeof knowledgeBase.$inferSelect;
 export type AiSettings = typeof aiSettings.$inferSelect;
 export type AutoReply = typeof autoReplies.$inferSelect;
 export type AiAction = typeof aiActions.$inferSelect;
+export type ContactReview = typeof contactReviews.$inferSelect;

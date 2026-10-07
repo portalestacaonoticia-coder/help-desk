@@ -19,6 +19,9 @@ const ICONS = {
   dashboard: (
     <path d="M3 3v18h18M7 15l4-4 3 3 5-6" />
   ),
+  cancel: (
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM17 8l5 5M22 8l-5 5" />
+  ),
 } as const;
 
 function NavItem({
@@ -126,6 +129,14 @@ export default function Sidebar({
             />
           ))
         )}
+
+        <div className="nav-section">Triagem</div>
+        <NavItem
+          href="/cancelamentos"
+          icon="cancel"
+          label="Cancelamentos"
+          active={pathname.startsWith("/cancelamentos")}
+        />
 
         <div className="nav-section">Conhecimento</div>
         <NavItem

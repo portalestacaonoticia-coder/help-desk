@@ -641,6 +641,19 @@ label {
   color: inherit;
 }
 
+/* Triagem de cancelamentos: checkbox · contato · termos · última msg · situação */
+.trow.cancel-row {
+  grid-template-columns: 34px minmax(0, 1.2fr) 190px minmax(0, 1.4fr) 180px;
+}
+@media (max-width: 1100px) {
+  .trow.cancel-row {
+    grid-template-columns: 34px minmax(0, 1fr) 150px 140px;
+  }
+  .trow.cancel-row > a {
+    display: none;
+  }
+}
+
 /* Selo "Respondido" ao lado do assunto na fila. */
 .t-subject .badge {
   margin-left: 8px;

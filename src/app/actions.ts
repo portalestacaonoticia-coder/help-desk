@@ -15,6 +15,7 @@ import {
   aiActions,
   autoReplies,
   mailboxes,
+  contactReviews,
 } from "@/db/schema";
 import { sendReply, verifySmtp } from "@/lib/smtp";
 import { encryptSecret } from "@/lib/crypto";
@@ -240,25 +241,25 @@ export async function deleteThreadsAction(formData: FormData) {
  * marketing. Por isso devolve mensagem em vez de lançar — o agente precisa
  * ver o que aconteceu.
  */
-export async function unsubscribeContactAction(
-  _prev: string | undefined,
-  formData: FormData,
-): Promise<string | undefined> {
-  await requireUser();
-  const threadId = Number(formData.get("threadId"));
+/**
+ * Resultado do descadastramento de um contato. `ok` é false só em falha
+ * real: timeout da Everinbox devolve ok com aviso, porque a remoção quase
+ * certamente aconteceu.
+ */
+export type UnsubscribeResult = { ok: boolean; message: string };
 
-  const [thread] = await db
-    .select({ customerAddr: threads.customerAddr, mailboxId: threads.mailboxId })
-    .from(threads)
-    .where(eq(threads.id, threadId))
-    .limit(1);
-  if (!thread) return "Chamado não encontrado.";
-  if (!thread.customerAddr) return "Este chamado não tem e-mail de contato.";
-
+/**
+ * Remove um e-mail de todos os projetos da Everinbox ligados à caixa.
+ * Núcleo compartilhado pelo botão do chamado e pela triagem de cancelamentos.
+ */
+async function unsubscribeFromMailboxProjects(
+  email: string,
+  mailboxId: number,
+): Promise<UnsubscribeResult> {
   const [mb] = await db
     .select({ everinboxProjectIds: mailboxes.everinboxProjectIds })
     .from(mailboxes)
-    .where(eq(mailboxes.id, thread.mailboxId))
+    .where(eq(mailboxes.id, mailboxId))
     .limit(1);
 
   const projetos = (mb?.everinboxProjectIds ?? "")
@@ -267,10 +268,11 @@ export async function unsubscribeContactAction(
     .filter(Boolean);
 
   if (projetos.length === 0) {
-    return "A operação desta caixa não está ligada a nenhum projeto na Everinbox.";
+    return {
+      ok: false,
+      message: "A operação desta caixa não está ligada a nenhum projeto na Everinbox.",
+    };
   }
-
-  const email = thread.customerAddr;
 
   /**
    * Um projeto. Em caso de timeout tenta de novo: o DELETE é idempotente, e
@@ -280,7 +282,7 @@ export async function unsubscribeContactAction(
   async function removerDe(projectId: string) {
     for (let tentativa = 1; tentativa <= 2; tentativa++) {
       try {
-        await deleteLead({ idOrEmail: email!, projectId });
+        await deleteLead({ idOrEmail: email, projectId });
         return "removido" as const;
       } catch (err) {
         if (err instanceof EverinboxError && err.status === 404) {
@@ -305,8 +307,6 @@ export async function unsubscribeContactAction(
   // poderia passar do limite de tempo da função.
   const resultados = await Promise.allSettled(projetos.map(removerDe));
 
-  revalidatePath(`/tickets/${threadId}`);
-
   const conta = (v: string) =>
     resultados.filter((r) => r.status === "fulfilled" && r.value === v).length;
 
@@ -317,19 +317,154 @@ export async function unsubscribeContactAction(
 
   if (erros.length > 0) {
     const motivo = (erros[0] as PromiseRejectedResult).reason;
-    return `Falhou em ${erros.length} de ${projetos.length} projeto(s): ${
-      motivo instanceof Error ? motivo.message : String(motivo)
-    }`;
+    return {
+      ok: false,
+      message: `Falhou em ${erros.length} de ${projetos.length} projeto(s): ${
+        motivo instanceof Error ? motivo.message : String(motivo)
+      }`,
+    };
   }
 
   // Timeout não é falha: a remoção provavelmente aconteceu, só não confirmou.
   if (incertos > 0) {
-    return `${email} removido de ${removidos + ausentes} projeto(s). Em ${incertos} a Everinbox não confirmou a tempo — provavelmente saiu também, confira no painel dela.`;
+    return {
+      ok: true,
+      message: `${email} removido de ${removidos + ausentes} projeto(s). Em ${incertos} a Everinbox não confirmou a tempo — provavelmente saiu também, confira no painel dela.`,
+    };
   }
   if (removidos === 0) {
-    return `${email} já não estava em nenhum dos ${projetos.length} projeto(s).`;
+    return {
+      ok: true,
+      message: `${email} já não estava em nenhum dos ${projetos.length} projeto(s).`,
+    };
   }
-  return `${email} removido de ${removidos} projeto(s)${ausentes > 0 ? ` (não estava em ${ausentes})` : ""}.`;
+  return {
+    ok: true,
+    message: `${email} removido de ${removidos} projeto(s)${ausentes > 0 ? ` (não estava em ${ausentes})` : ""}.`,
+  };
+}
+
+export async function unsubscribeContactAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  await requireUser();
+  const threadId = Number(formData.get("threadId"));
+
+  const [thread] = await db
+    .select({ customerAddr: threads.customerAddr, mailboxId: threads.mailboxId })
+    .from(threads)
+    .where(eq(threads.id, threadId))
+    .limit(1);
+  if (!thread) return "Chamado não encontrado.";
+  if (!thread.customerAddr) return "Este chamado não tem e-mail de contato.";
+
+  const result = await unsubscribeFromMailboxProjects(
+    thread.customerAddr,
+    thread.mailboxId,
+  );
+  revalidatePath(`/tickets/${threadId}`);
+  return result.message;
+}
+
+/* ------------------------------------------------------------------ */
+/* Triagem de cancelamentos (/cancelamentos)                           */
+/* ------------------------------------------------------------------ */
+
+/** Um contato da tela de cancelamentos, como o cliente o identifica. */
+export type FlaggedContactRef = {
+  mailboxId: number;
+  email: string;
+  /** Mensagem mais recente na lista — é até onde a decisão vale. */
+  lastMessageId: number;
+};
+
+function parseFlaggedRef(ref: FlaggedContactRef): FlaggedContactRef | null {
+  const mailboxId = Number(ref?.mailboxId);
+  const lastMessageId = Number(ref?.lastMessageId);
+  const email = String(ref?.email ?? "").trim().toLowerCase();
+  if (!Number.isInteger(mailboxId) || mailboxId <= 0) return null;
+  if (!Number.isInteger(lastMessageId) || lastMessageId <= 0) return null;
+  if (!email.includes("@")) return null;
+  return { mailboxId, email, lastMessageId };
+}
+
+async function saveContactReview(
+  ref: FlaggedContactRef,
+  status: "descadastrado" | "ignorado",
+  note: string | null,
+  userId: number | null,
+) {
+  await db
+    .insert(contactReviews)
+    .values({
+      mailboxId: ref.mailboxId,
+      email: ref.email,
+      status,
+      lastMessageId: ref.lastMessageId,
+      note,
+      reviewedByUserId: userId,
+      reviewedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [contactReviews.mailboxId, contactReviews.email],
+      set: {
+        status,
+        lastMessageId: ref.lastMessageId,
+        note,
+        reviewedByUserId: userId,
+        reviewedAt: new Date(),
+      },
+    });
+}
+
+/**
+ * Descadastra UM contato da triagem na Everinbox e registra a decisão.
+ *
+ * Um por chamada, de propósito: a tela percorre a seleção e mostra o
+ * resultado de cada linha. Em lote numa action só, 20 contatos × 25s de
+ * timeout estourariam o tempo da função e ninguém saberia quem saiu.
+ *
+ * Falha real NÃO grava decisão — o contato continua na lista para tentar
+ * de novo. Timeout grava como descadastrado com a ressalva na nota.
+ */
+export async function unsubscribeFlaggedContactAction(
+  input: FlaggedContactRef,
+): Promise<UnsubscribeResult> {
+  const user = await requireUser();
+  const ref = parseFlaggedRef(input);
+  if (!ref) return { ok: false, message: "Contato inválido." };
+
+  const result = await unsubscribeFromMailboxProjects(ref.email, ref.mailboxId);
+  if (result.ok) {
+    await saveContactReview(ref, "descadastrado", result.message, Number(user.id) || null);
+    revalidatePath("/cancelamentos");
+  }
+  return result;
+}
+
+/**
+ * Marca contatos da triagem como ignorados (falso positivo, ou cliente que
+ * já foi atendido de outra forma). Nada sai do Help Desk: é só registro.
+ */
+export async function ignoreFlaggedContactsAction(
+  input: FlaggedContactRef[],
+): Promise<{ ok: boolean; message: string }> {
+  const user = await requireUser();
+  const refs = (Array.isArray(input) ? input : [])
+    .map(parseFlaggedRef)
+    .filter((r): r is FlaggedContactRef => r !== null);
+  if (refs.length === 0) return { ok: false, message: "Nenhum contato válido." };
+
+  for (const ref of refs) {
+    await saveContactReview(ref, "ignorado", null, Number(user.id) || null);
+  }
+  revalidatePath("/cancelamentos");
+  const n = refs.length;
+  return {
+    ok: true,
+    message: `${n} contato${n === 1 ? "" : "s"} ignorado${n === 1 ? "" : "s"}.`,
+  };
 }
 
 /** Cria uma nova macro. */
