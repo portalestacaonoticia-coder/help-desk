@@ -2,7 +2,7 @@
  * Detecção de pedidos de cancelamento e ameaças no texto do cliente.
  *
  * Não cancela nada: só diz se a mensagem contém um dos termos de triagem
- * (cancelar, Procon, processar, advogado, mentira…) para a tela de
+ * (cancelar, Procon, advogado, mentira…) para a tela de
  * cancelamentos reunir os contatos. Quem decide é o agente.
  *
  * TOLERÂNCIA A ERRO DE DIGITAÇÃO: cada termo é um radical ("cancel" cobre
@@ -23,7 +23,6 @@ export type CancelTerm = {
 export const CANCEL_TERMS: readonly CancelTerm[] = [
   { stem: "cancel", label: "cancelar" },
   { stem: "procon", label: "Procon" },
-  { stem: "process", label: "processar" },
   { stem: "advog", label: "advogado" },
   { stem: "mentir", label: "mentira" },
 ];

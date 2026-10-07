@@ -45,7 +45,7 @@ base de conhecimento continua editável.
 ## Triagem de cancelamentos
 
 A tela **Cancelamentos** reúne os contatos que escreveram, nas mensagens
-recebidas, termos como cancelar, Procon, processar, advogado e mentira — com
+recebidas, termos como cancelar, Procon, advogado e mentira — com
 tolerância a erro de digitação (cansela, procom, adivogado…). O texto citado da
 nossa resposta anterior é ignorado, senão qualquer reply entraria.
 
