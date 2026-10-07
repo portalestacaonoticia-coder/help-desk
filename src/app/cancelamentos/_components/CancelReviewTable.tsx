@@ -23,6 +23,9 @@ type RowState =
  * chamada só estouraria o tempo da função sem dizer quem saiu. Assim cada
  * linha mostra o próprio resultado, e dá para fechar a aba no meio sem
  * perder o que já foi feito.
+ *
+ * Ao fim do lote a lista é recarregada do servidor uma vez: os tratados
+ * somem, os que falharam continuam, com o erro na linha.
  */
 export default function CancelReviewTable({
   contacts,
@@ -98,10 +101,15 @@ export default function CancelReviewTable({
     setSelected(new Set());
     setBusy(false);
     setSummary(
-      `${sucesso} descadastrado${sucesso === 1 ? "" : "s"}${
-        falha > 0 ? `, ${falha} com falha (continuam na lista)` : ""
-      }.`,
+      `Pronto: ${sucesso} contato${sucesso === 1 ? "" : "s"} descadastrado${
+        sucesso === 1 ? "" : "s"
+      } na Everinbox e retirado${sucesso === 1 ? "" : "s"} da lista.${
+        falha > 0
+          ? ` ${falha} ${falha === 1 ? "falhou e continua" : "falharam e continuam"} na lista, com o motivo na linha.`
+          : ""
+      } Para rever os tratados, use o filtro "Já tratados".`,
     );
+    router.refresh();
   }
 
   async function ignoreSelected() {
@@ -121,8 +129,13 @@ export default function CancelReviewTable({
       for (const c of alvo) {
         setRow(c.key, { kind: "done", ok: r.ok, message: r.ok ? "Ignorado." : r.message });
       }
-      setSummary(r.message);
+      setSummary(
+        r.ok
+          ? `Pronto: ${r.message} Saíram da lista; para rever, use o filtro "Já tratados".`
+          : r.message,
+      );
       setSelected(new Set());
+      if (r.ok) router.refresh();
     } finally {
       setBusy(false);
     }
@@ -163,10 +176,7 @@ export default function CancelReviewTable({
 
       {summary && (
         <div className="callout" style={{ marginBottom: 12 }}>
-          {summary}{" "}
-          <button type="button" onClick={() => router.refresh()}>
-            Atualizar lista
-          </button>
+          {summary}
         </div>
       )}
 

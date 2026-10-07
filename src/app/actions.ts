@@ -427,6 +427,8 @@ async function saveContactReview(
  *
  * Falha real NÃO grava decisão — o contato continua na lista para tentar
  * de novo. Timeout grava como descadastrado com a ressalva na nota.
+ *
+ * Não revalida a rota: quem chama em lote atualiza a lista uma vez no fim.
  */
 export async function unsubscribeFlaggedContactAction(
   input: FlaggedContactRef,
@@ -438,8 +440,9 @@ export async function unsubscribeFlaggedContactAction(
   const result = await unsubscribeFromMailboxProjects(ref.email, ref.mailboxId);
   if (result.ok) {
     await saveContactReview(ref, "descadastrado", result.message, Number(user.id) || null);
-    revalidatePath("/cancelamentos");
   }
+  // Sem revalidatePath aqui: a tela chama vários destes em sequência e
+  // atualiza a lista uma vez só, no fim do lote.
   return result;
 }
 
@@ -459,7 +462,6 @@ export async function ignoreFlaggedContactsAction(
   for (const ref of refs) {
     await saveContactReview(ref, "ignorado", null, Number(user.id) || null);
   }
-  revalidatePath("/cancelamentos");
   const n = refs.length;
   return {
     ok: true,
