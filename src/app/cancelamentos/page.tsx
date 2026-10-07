@@ -12,6 +12,9 @@ import { isEverinboxConfigured } from "@/lib/everinbox";
 import CancelReviewTable from "./_components/CancelReviewTable";
 
 export const dynamic = "force-dynamic";
+// A varredura lê todas as mensagens do período; "Todo o período" pode passar
+// dos 10s padrão do Vercel.
+export const maxDuration = 60;
 
 type SP = { dias?: string; caixa?: string; tratados?: string };
 
@@ -92,8 +95,9 @@ export default async function CancelamentosPage({
 
         {truncated && (
           <div className="callout warn">
-            A análise parou no teto de {scanned} mensagens. Reduza o período ou
-            filtre por caixa para garantir que nenhum contato ficou de fora.
+            A análise parou por tempo depois de {scanned} mensagens — as mais
+            antigas ficaram de fora. Reduza o período ou filtre por caixa para
+            garantir que nenhum contato escapou.
           </div>
         )}
 

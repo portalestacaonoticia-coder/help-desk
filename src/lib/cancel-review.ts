@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { contactReviews, mailboxes, messages, threads } from "@/db/schema";
 import { excerptAround, findCancelTerms } from "@/lib/cancel-terms";
@@ -12,15 +12,19 @@ import { excerptAround, findCancelTerms } from "@/lib/cancel-terms";
  * então o mesmo e-mail em duas operações são dois itens.
  *
  * A busca é feita aqui, não no SQL: a tolerância a erro de digitação não
- * cabe num LIKE. Para não puxar o banco inteiro, só o começo de cada corpo
- * entra (quem pede cancelamento diz isso nas primeiras linhas) e há um teto
- * de mensagens, das mais novas para as mais antigas.
+ * cabe num LIKE. Para caber na memória, só o começo de cada corpo entra
+ * (quem pede cancelamento diz isso nas primeiras linhas) e as mensagens são
+ * lidas em lotes, das mais novas para as mais antigas, sem teto de
+ * quantidade. O único limite é de tempo, para a função não ser derrubada
+ * pelo Vercel no meio — e quando ele bate a tela avisa.
  */
 
 export const WINDOW_OPTIONS = [7, 30, 90, 0] as const; // 0 = sem limite
 export const DEFAULT_WINDOW_DAYS = 30;
-const MAX_MESSAGES = 5000;
+const BATCH = 2000;
 const BODY_PREFIX = 3000;
+// Abaixo do maxDuration da página (60s), com folga para as consultas finais.
+const TIME_BUDGET_MS = 45_000;
 
 export type FlaggedContact = {
   /** Chave estável para seleção: `${mailboxId}:${email}`. */
@@ -51,7 +55,7 @@ export type FlaggedContact = {
 export type FlaggedResult = {
   contacts: FlaggedContact[];
   scanned: number;
-  /** O teto de mensagens foi atingido: pode haver contatos fora da lista. */
+  /** A varredura parou por tempo: as mensagens mais antigas ficaram de fora. */
   truncated: boolean;
 };
 
@@ -73,64 +77,85 @@ export async function listFlaggedContacts(params: {
   }
   if (mailboxId) conditions.push(eq(messages.mailboxId, mailboxId));
 
-  const rows = await db
-    .select({
-      id: messages.id,
-      threadId: messages.threadId,
-      mailboxId: messages.mailboxId,
-      subject: messages.subject,
-      body: sql<string>`left(${messages.bodyText}, ${BODY_PREFIX})`,
-      sentAt: messages.sentAt,
-      createdAt: messages.createdAt,
-      customerAddr: threads.customerAddr,
-      mailboxName: sql<string>`coalesce(nullif(${mailboxes.operation}, ''), ${mailboxes.label})`,
-      projectIds: mailboxes.everinboxProjectIds,
-    })
-    .from(messages)
-    .innerJoin(threads, eq(threads.id, messages.threadId))
-    .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
-    .where(and(...conditions))
-    .orderBy(desc(messages.id))
-    .limit(MAX_MESSAGES);
-
+  const startedAt = Date.now();
   const groups = new Map<string, FlaggedContact>();
+  let scanned = 0;
+  let truncated = false;
+  let lastId: number | null = null;
 
-  for (const r of rows) {
-    const hits = findCancelTerms(r.body);
-    if (hits.length === 0) continue;
+  for (;;) {
+    const rows = await db
+      .select({
+        id: messages.id,
+        threadId: messages.threadId,
+        mailboxId: messages.mailboxId,
+        subject: messages.subject,
+        body: sql<string>`left(${messages.bodyText}, ${BODY_PREFIX})`,
+        sentAt: messages.sentAt,
+        createdAt: messages.createdAt,
+        customerAddr: threads.customerAddr,
+        mailboxName: sql<string>`coalesce(nullif(${mailboxes.operation}, ''), ${mailboxes.label})`,
+        projectIds: mailboxes.everinboxProjectIds,
+      })
+      .from(messages)
+      .innerJoin(threads, eq(threads.id, messages.threadId))
+      .innerJoin(mailboxes, eq(mailboxes.id, messages.mailboxId))
+      .where(
+        and(
+          ...conditions,
+          lastId === null ? undefined : lt(messages.id, lastId),
+        ),
+      )
+      .orderBy(desc(messages.id))
+      .limit(BATCH);
 
-    const email = r.customerAddr!.trim().toLowerCase();
-    const key = `${r.mailboxId}:${email}`;
-    const existing = groups.get(key);
+    scanned += rows.length;
+    if (rows.length > 0) lastId = rows[rows.length - 1].id;
 
-    if (existing) {
-      // As linhas vêm da mais nova para a mais antiga: a primeira já fixou
-      // "última mensagem" e trecho; as seguintes só somam termos e contagem.
-      existing.hits += 1;
-      for (const h of hits) {
-        if (!existing.terms.includes(h.term.label)) existing.terms.push(h.term.label);
-        if (!existing.words.includes(h.word)) existing.words.push(h.word);
+    for (const r of rows) {
+      const hits = findCancelTerms(r.body);
+      if (hits.length === 0) continue;
+
+      const email = r.customerAddr!.trim().toLowerCase();
+      const key = `${r.mailboxId}:${email}`;
+      const existing = groups.get(key);
+
+      if (existing) {
+        // As linhas vêm da mais nova para a mais antiga: a primeira já fixou
+        // "última mensagem" e trecho; as seguintes só somam termos e contagem.
+        existing.hits += 1;
+        for (const h of hits) {
+          if (!existing.terms.includes(h.term.label))
+            existing.terms.push(h.term.label);
+          if (!existing.words.includes(h.word)) existing.words.push(h.word);
+        }
+        continue;
       }
-      continue;
+
+      groups.set(key, {
+        key,
+        mailboxId: r.mailboxId,
+        mailboxName: r.mailboxName,
+        projectLinked: Boolean(r.projectIds?.trim()),
+        email,
+        terms: hits.map((h) => h.term.label),
+        words: hits.map((h) => h.word),
+        hits: 1,
+        lastMessageId: r.id,
+        lastThreadId: r.threadId,
+        lastSubject: r.subject,
+        lastAt: r.sentAt ?? r.createdAt,
+        excerpt: excerptAround(r.body, hits[0]),
+        previous: null,
+        handled: false,
+      });
     }
 
-    groups.set(key, {
-      key,
-      mailboxId: r.mailboxId,
-      mailboxName: r.mailboxName,
-      projectLinked: Boolean(r.projectIds?.trim()),
-      email,
-      terms: hits.map((h) => h.term.label),
-      words: hits.map((h) => h.word),
-      hits: 1,
-      lastMessageId: r.id,
-      lastThreadId: r.threadId,
-      lastSubject: r.subject,
-      lastAt: r.sentAt ?? r.createdAt,
-      excerpt: excerptAround(r.body, hits[0]),
-      previous: null,
-      handled: false,
-    });
+    if (rows.length < BATCH) break;
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      truncated = true;
+      break;
+    }
   }
 
   // Decisões já tomadas. Uma consulta só, filtrada pelas caixas da lista.
@@ -152,7 +177,9 @@ export async function listFlaggedContacts(params: {
     g.handled = rv.lastMessageId >= g.lastMessageId;
   }
 
-  const contacts = [...groups.values()].filter((g) => includeHandled || !g.handled);
+  const contacts = [...groups.values()].filter(
+    (g) => includeHandled || !g.handled,
+  );
 
-  return { contacts, scanned: rows.length, truncated: rows.length >= MAX_MESSAGES };
+  return { contacts, scanned, truncated };
 }
