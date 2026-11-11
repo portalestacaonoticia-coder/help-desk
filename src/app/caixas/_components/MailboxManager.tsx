@@ -6,6 +6,7 @@ import {
   saveMailboxAction,
   testMailboxAction,
   skipBacklogAction,
+  deleteMailboxAction,
 } from "@/app/actions";
 
 export type MailboxLite = {
@@ -90,6 +91,45 @@ function SkipBacklog({ id, lastUid }: { id: number; lastUid: number }) {
       </button>
       {result && (
         <span className={failed ? "error" : "ok-text"} style={{ fontSize: 12 }}>
+          {result}
+        </span>
+      )}
+    </form>
+  );
+}
+
+/**
+ * Remove a caixa e tudo o que o Help Desk guardou dela. Pede o rótulo
+ * digitado, não só um OK: apaga respostas em massa e não tem volta.
+ */
+function DeleteMailbox({
+  id,
+  label,
+  threadCount,
+}: {
+  id: number;
+  label: string;
+  threadCount: number;
+}) {
+  const [result, action, pending] = useActionState(deleteMailboxAction, undefined);
+
+  return (
+    <form
+      action={action}
+      style={{ display: "flex", alignItems: "center", gap: 10 }}
+      onSubmit={(e) => {
+        const typed = window.prompt(
+          `Remover a caixa "${label}"?\n\nIsso apaga do Help Desk ${threadCount} resposta${threadCount === 1 ? "" : "s"}, com mensagens, análises da IA, macros, respostas automáticas e triagem de cancelamentos desta caixa. Os e-mails continuam no servidor IMAP. Não dá para desfazer.\n\nDigite o rótulo da caixa (${label}) para confirmar:`,
+        );
+        if (typed?.trim() !== label) e.preventDefault();
+      }}
+    >
+      <input type="hidden" name="id" value={id} />
+      <button type="submit" className="danger" disabled={pending}>
+        {pending ? "Removendo…" : "Remover caixa"}
+      </button>
+      {result && (
+        <span className="error" style={{ fontSize: 12 }}>
           {result}
         </span>
       )}
@@ -248,6 +288,11 @@ export default function MailboxManager({
                 >
                   <TestConnection id={mb.id} />
                   <SkipBacklog id={mb.id} lastUid={mb.lastUid} />
+                  <DeleteMailbox
+                    id={mb.id}
+                    label={mb.label}
+                    threadCount={mb.threadCount}
+                  />
                 </div>
               )}
             </div>

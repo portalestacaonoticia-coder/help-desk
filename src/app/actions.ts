@@ -16,6 +16,7 @@ import {
   autoReplies,
   mailboxes,
   contactReviews,
+  ingestLogs,
 } from "@/db/schema";
 import { sendReply, verifySmtp } from "@/lib/smtp";
 import { encryptSecret } from "@/lib/crypto";
@@ -911,6 +912,59 @@ export async function saveMailboxAction(formData: FormData) {
   }
 
   revalidatePath("/caixas");
+}
+
+/**
+ * Remove a caixa e tudo o que pertence a ela. DESTRUTIVO e sem desfazer:
+ * apaga respostas, mensagens, análises da IA, macros e logs de ingestão da
+ * caixa. Os e-mails continuam no servidor IMAP — só o Help Desk esquece deles.
+ *
+ * A ordem segue as FKs (ai_actions → messages/threads → mailboxes). Respostas
+ * automáticas e triagem de cancelamentos saem sozinhas pelo ON DELETE CASCADE.
+ * Tudo numa transação: falhar no meio não pode deixar a caixa pela metade.
+ */
+export async function deleteMailboxAction(
+  _prev: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  if (!Number.isInteger(id) || id <= 0) return "Caixa inválida.";
+
+  try {
+    const removida = await db.transaction(async (tx) => {
+      const [mb] = await tx
+        .select({ id: mailboxes.id })
+        .from(mailboxes)
+        .where(eq(mailboxes.id, id))
+        .limit(1);
+      if (!mb) return false;
+
+      const msgIds = tx
+        .select({ id: messages.id })
+        .from(messages)
+        .where(eq(messages.mailboxId, id));
+      const threadIds = tx
+        .select({ id: threads.id })
+        .from(threads)
+        .where(eq(threads.mailboxId, id));
+
+      await tx.delete(aiActions).where(inArray(aiActions.messageId, msgIds));
+      await tx.delete(aiActions).where(inArray(aiActions.threadId, threadIds));
+      await tx.delete(messages).where(eq(messages.mailboxId, id));
+      await tx.delete(threads).where(eq(threads.mailboxId, id));
+      await tx.delete(macros).where(eq(macros.mailboxId, id));
+      await tx.delete(ingestLogs).where(eq(ingestLogs.mailboxId, id));
+      await tx.delete(mailboxes).where(eq(mailboxes.id, id));
+      return true;
+    });
+    if (!removida) return "Caixa não encontrada.";
+  } catch (err) {
+    return `Falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
+
+  revalidateShell();
+  return undefined;
 }
 
 /**
